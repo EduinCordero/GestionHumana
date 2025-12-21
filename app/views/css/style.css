@@ -1,0 +1,285 @@
+body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.884); /* Fondo blanco con 60% de opacidad */
+    position: relative;
+}
+
+.container {
+    max-width: 800px;
+}
+
+h1 {
+    font-size: 32px;
+    color: #0058af;
+}
+
+p {
+    font-size: 16px;
+    color: rgb(96, 99, 99);
+}
+
+form {
+    max-width: 500px;
+    margin: auto;
+}
+
+label {
+    display: flex;
+    margin-top: 10px;
+    font-size: 16px;
+    align-items: center;
+}
+
+input[type="submit"] {
+    width: auto;
+    padding: 10px 20px;
+    margin-top: 20px;
+}
+
+input[type="radio"] {
+    margin-right: 10px;
+}
+
+button {
+    background-color: #0058AE; /* Azul cielo */
+    color: white;
+    border: none;
+    padding: 10px 100px;
+    font-size: 18px;
+    border-radius: 50px; /* Redondeado */
+    cursor: pointer;
+    margin-top: 20px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+button:hover {
+    background-color: #299ad1; /* Azul cielo más oscuro al pasar el ratón */
+    color: white;
+}
+
+.progress-container {
+    width: 100%;
+    background-color: #f3f3f3;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 10px;
+}
+
+.progress-bar {
+    width: 10%;
+    height: 100%;
+    background-color: #0058af; /* Azul cielo */
+}
+
+.section {
+    display: none;
+}
+
+.section.active {
+    display: block;
+}
+
+.options {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.option-button {
+    background-color: white;
+    border: 1px solid #ccc;
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 16px;
+    text-align: center;
+    color: #0058af;
+    display: flex;
+    width: 300px;
+}
+
+.option-button.selected {
+    background-color: #299ad1;
+    color: white;
+}
+
+.loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.loading-text {
+    font-size: 24px;
+    color: #0058af;
+}
+
+.back-button {
+    background-color: white;
+    border: 1px solid #299ad1;
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 16px;
+    display: inline-block;
+    text-align: center;
+    position: fixed;
+    top: 25px;
+    left: 10px;
+    color: #299ad1;
+}
+
+.back-button:hover {
+    background-color: #299ad1;
+    color: white;
+}
+
+/* lOGIN */
+
+label {
+    display: flex;
+    align-items: center;
+    margin: 10px 0;
+    font-size: 14px;
+    color: rgb(96, 99, 99);
+}
+
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f3f3f3; /* Fondo gris */
+    font-size: 18px; /* Tamaño de fuente más grande */
+}
+
+
+.submit-button {
+    padding: 6px;
+    margin: 10px 30px;
+    border: none;
+    background-color: #0058AE; /* Azul cielo */
+    color: white;
+    font-size: 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+ul{
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+
+.header {
+    position: absolute;
+    top: 20px;
+    right: 10px;
+    display: flex;
+    align-items: center;
+    background-color: #ffffff;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.user-menu {
+    position: relative;
+    display: inline-block;
+    margin-left: 10px;
+}
+
+.user-icon {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+
+.menu-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: white;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+    z-index: 1;
+}
+
+.user-menu:hover .menu-content {
+    display: block;
+}
+
+.menu-content a {
+    color: black;
+    padding: 12px 16px;
+    text-decoration: none;
+    display: block;
+    width: 100px;
+    font-size: 14px;
+}
+
+.menu-content a:hover {
+    background-color: #ddd;
+}
+
+.help-content {
+    width: 500px; /* Ajusta el ancho según sea necesario */
+    right: -200px; /* Ajusta la posición según sea necesario */
+    display: none;
+    position: absolute;
+    right: 0;
+    background-color: white;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    width: 300px;
+    padding: 20px;
+    text-align: left;
+}
+
+.help-menu:hover .help-content {
+    display: block;
+}
+
+.employee-name {
+    flex: 1;
+    margin-right: 10px;
+}
+
+.submit-button:hover {
+    background-color: #0056b3;
+}
+
+.logo {
+    height: 50px;
+}
+
+.img-logo {
+    position: absolute;
+    top: 30px;
+    left: 90px;
+}

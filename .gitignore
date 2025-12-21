@@ -1,0 +1,25 @@
+# Dependencias
+/vendor/
+
+# Archivos de entorno
+.env
+.env.*
+
+# Logs
+*.log
+
+# Caché / temporales
+/tmp/
+/cache/
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# XAMPP
+htdocs/
+
+.tmp.driveupload/

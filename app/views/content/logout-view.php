@@ -1,0 +1,2 @@
+<?php
+    $loginController->cerrarSesionControlador();

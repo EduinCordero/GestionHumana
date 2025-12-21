@@ -1,0 +1,29 @@
+RewriteEngine On
+Options All -Indexes
+
+# Proteger archivos sensibles
+<FilesMatch "^(htaccess|config|database)\.php$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Permitir acceso a archivos clave directamente
+RewriteCond %{REQUEST_URI} ^/(index\.php|app/|config/|autoload\.php) [NC]
+RewriteRule ^ - [L]
+
+# Permitir archivos estáticos existentes
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# EXCEPCIÓN: permitir activarCuenta.php directamente
+RewriteCond %{REQUEST_URI} !/activarCuenta\.php$ [NC]
+
+# Redirigir todo a index.php con el parámetro "views"
+RewriteRule ^([a-zA-Z0-9/ñÑ\-_]+)$ index.php?views=$1 [QSA,L]
+
+<FilesMatch "^\.(htaccess|htpasswd)$|^(config|database|env|autoload)\.php$">
+    Require all denied
+</FilesMatch>
+
+

@@ -48,17 +48,28 @@
                     require_once __DIR__ . "/app/views/inc/header.php";
                 }
             ?>
-            <div class="w-full" role="main">
-                <?php
-                if (file_exists($rutaVista)) {
-                    // Incluir la vista solicitada
-                    require_once $rutaVista;
-                } else {
-                    // Incluir vista 404
-                    require_once __DIR__ . "/app/views/content/404-view.php";
-                }
-                ?>
-            </div>
+            <?php
+    // Coloca el 'use' aquí, fuera de los bloques de código, para evitar errores de sintaxis
+    use app\controllers\reportController;
+?>
+
+<div class="w-full" role="main">
+    <?php
+    if (file_exists($rutaVista)) {
+        // Si la vista solicitada es reportes, ejecutamos el controlador primero Eduin
+        if ($url[0] == "reportes") {
+            $insReport = new reportController();
+            // Esto buscará los datos y cargará la vista automáticamente
+            $insReport->obtenerMisEvaluaciones();
+        } else {
+            // Para las demás páginas, carga la vista directamente
+            require_once $rutaVista;
+        }
+    } else {
+        require_once __DIR__ . "/app/views/content/404-view.php";
+    }
+    ?>
+</div>
             <?php
             ?>
         </div>

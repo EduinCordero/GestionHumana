@@ -23,3 +23,8 @@ Thumbs.db
 htdocs/
 
 .tmp.driveupload/
+
+*.zip
+/vendor/
+.env
+*.log

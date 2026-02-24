@@ -12,7 +12,8 @@
                 <form id="evaluationForm" class="FormularioAjax" action="<?php echo APP_URL; ?>app/ajax/formulariosAjax.php" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="modulo_evaluacion" value="registrarEvaluacionLider">
                     <input type="hidden" name="empleadoevaluado" value="<?php echo $idempleado; ?>">
-
+// Aquí comienza el formulario de evaluación de liderazgo
+// Error estructural, el formulario coimenza en la sección 4 y no en la 1.
                     <div class="section active" id="section4" style="text-align: center;"> 
                         <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Propósito</h1>
                         <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿Cómo tu líder traduce la visión y objetivos de la organización en metas claras y alcanzables para su equipo, y de qué manera asegura que cada miembro comprenda el impacto de su contribución al éxito colectivo de la clínica?</p>

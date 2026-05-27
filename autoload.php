@@ -1,4 +1,10 @@
 <?php
+// Configurar NLS_LANG para Oracle antes de cualquier conexión
+putenv('NLS_LANG=SPANISH_SPAIN.WE8MSWIN1252');
+
+// Cargar funciones de encoding para conversión UTF-8 ↔ Windows-1252
+require_once __DIR__ . '/config/encoding.php';
+
 spl_autoload_register(function($clase){
     // Convertir los namespaces en rutas de archivos
     $clase = str_replace("\\", "/", $clase);

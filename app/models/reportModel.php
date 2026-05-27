@@ -2,366 +2,595 @@
 namespace app\models;
 
 use app\models\mainModel;
+use app\models\competenciaModel;
 
+/**
+ * reportModel — Modelo de reportes V2
+ *
+ * Refactorizado para leer de HUMRESPUESTA en vez de las tablas V1.
+ * Los diccionarios de competencias ahora vienen de HUMCOMPETENCIA via competenciaModel.
+ */
 class reportModel extends mainModel {
 
-    // --- DICCIONARIOS DE COMPETENCIAS (Reglas de Negocio) ---
-    public static function getDictColaborador() {
-        return [
-            1 => 'Calidez Humana y Servicio con Propósito',
-            2 => 'Liderazgo e Integridad en la Acción',
-            3 => 'Competitividad, Innovación y Adaptabilidad',
-            4 => 'Comunicación Asertiva y Sentido de Pertenencia',
-            5 => 'Compromiso con la calidad',
-            6 => 'Compromiso institucional y cumplimiento de normas internas',
-            7 => 'Participación y formación continua',
-            8 => 'Gestión de Seguridad y Salud en el Trabajo (SST)',
-            9 => 'Gestión de Relaciones Interpersonales',
-            10 => 'Eficacia en la Ejecución de Responsabilidades y Contribución a los Resultados',
-            11 => 'Gestión Eficiente del Tiempo y los Recursos'
-        ];
+    // ── Diccionarios — ahora leen de BD via competenciaModel ─────────────────
+
+    public static function getDictColaborador(): array {
+        return competenciaModel::getDictColaborador();
     }
 
-public static function getDictLiderazgo() {
-    return [
-        1 => 'Propósito',
-        2 => 'Colaboración',
-        3 => 'Consistencia',
-        4 => 'Adaptabilidad',
-        5 => 'Amor'
-    ];
-}
-
-    /** Devuelve el id de cargo para el empleado */
-    public function getCargoId($idempleado) {
-        $sql = "SELECT IDEMPCARGO FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS WHERE IDEMPLEADO = " . (int)$idempleado;
-        $res = $this->ejecutarConsulta($sql);
-        $row = oci_fetch_assoc($res);
-        return $row ? $row['IDEMPCARGO'] : null;
+    public static function getDictLiderazgo(): array {
+        return competenciaModel::getDictLiderazgo();
     }
 
-    public function getAutoEvaluacion($idempleado) {
-        $sql = "SELECT IDAUTOEVALUACION, FECHAREALIZA, PREGUNTA1, PREGUNTA2, PREGUNTA3, PREGUNTA4, PREGUNTA5, PREGUNTA6, PREGUNTA7, PREGUNTA8, PREGUNTA9, PREGUNTA10, PREGUNTA11, CONFIRMADO
-                FROM VAADINWEB.HUMAUTOEVALUACION
-                WHERE EMPLEADO_ID = " . (int)$idempleado . " ORDER BY FECHAREALIZA DESC";
-        $res = $this->ejecutarConsulta($sql);
-        return oci_fetch_assoc($res) ?: null;
+    // ── Período activo ────────────────────────────────────────────────────────
+
+    public function getPeriodoActivo(): ?array {
+        $sql = "SELECT IDPERIODO, NOMBRE,
+                       TO_CHAR(FECHAAPERTURA,'DD/MM/YYYY') AS FECHAAPERTURA,
+                       TO_CHAR(FECHACIERRE,  'DD/MM/YYYY') AS FECHACIERRE,
+                       ESTADO
+                FROM VAADINWEB.HUMPERIODOEVALUACION
+                WHERE ESTADO = 1 AND ROWNUM = 1";
+        return $this->ejecutarConsultaUnicaUTF8($sql);
     }
 
-       public function getEvaluacionesRecibidasColaborador($idempleado) {
-        // Agregamos las 11 preguntas a la consulta
-        $sql = "SELECT d.IDEVACOLABORADOR, d.CONFIRMADO, d.FECHACONFIRMA, 
-                    d.PREGUNTA1, d.PREGUNTA2, d.PREGUNTA3, d.PREGUNTA4, d.PREGUNTA5, 
-                    d.PREGUNTA6, d.PREGUNTA7, d.PREGUNTA8, d.PREGUNTA9, d.PREGUNTA10, d.PREGUNTA11,
-                    NVL(em.EMPLEADO,'Anónimo') AS EVALUADOR
-                FROM VAADINWEB.HUMEVALUACIONCOLABO d
-                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS em ON d.EMPLEADO_CONFIRMA = em.IDEMPLEADO
-                WHERE d.EMPLEADO_ID = " . (int)$idempleado . " 
-                AND em.ESPRINCIPAL = 1 
-                ORDER BY d.IDEVACOLABORADOR DESC";
-        
-        $res = $this->ejecutarConsulta($sql);
+    // ── Helper: filtro de período para HUMRESPUESTA ───────────────────────────
+
+    private function filtroPeriodo(?array $periodo, string $campoFecha = 'R.FECHARESPUESTA'): string {
+        if (!$periodo) return '';
+        // Usar IDPERIODO cuando está disponible — más preciso que filtrar por fechas
+        if (!empty($periodo['IDPERIODO'])) {
+            return " AND R.IDPERIODO = " . (int)$periodo['IDPERIODO'];
+        }
+        $ap = $periodo['FECHAAPERTURA'];
+        $ci = $periodo['FECHACIERRE'];
+        return " AND TRUNC($campoFecha) BETWEEN TO_DATE('$ap','DD/MM/YYYY') AND TO_DATE('$ci','DD/MM/YYYY')";
+    }
+
+    // ── Helper: convierte filas con valores por competencia ──────────────────
+
+    private function utf8Row(array $row): array {
+        foreach ($row as $k => $v) {
+            if (is_string($v)) {
+                $row[$k] = fromOracleEncoding($v);
+            }
+        }
+        return $row;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // AUTOEVALUACIÓN
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Devuelve la autoevaluación confirmada del período
+     * Formato: [IDCOMPETENCIA => ['VALOR'=>N, 'ETIQUETA'=>'...', 'NUM_PREGUNTA'=>N]]
+     */
+    public function getAutoEvaluacion(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT R.IDCOMPETENCIA, R.VALOR, O.ETIQUETA, C.NUM_PREGUNTA,
+                       C.NOMBRE AS NOMBRE_COMP
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMOPCIONESCALA O ON R.IDOPCION = O.IDOPCION
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA  C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                WHERE R.IDEMPLEADO      = $idempleado
+                  AND R.IDEMPLEADO_EVAL = $idempleado
+                  AND R.TIPO_EVAL       = 'AUTO'
+                  AND R.CONFIRMADO      = 1
+                  $filtro
+                ORDER BY C.NUM_PREGUNTA";
+        $rows = $this->ejecutarConsultaUTF8($sql);
+        $result = [];
+        foreach ($rows as $r) {
+            $result[(int)$r['IDCOMPETENCIA']] = [
+                'VALOR'        => (int)$r['VALOR'],
+                'ETIQUETA'     => $r['ETIQUETA'] ?? '',
+                'NOMBRE_COMP'  => $r['NOMBRE_COMP'] ?? '',
+                'NUM_PREGUNTA' => (int)$r['NUM_PREGUNTA'],
+            ];
+        }
+        return $result;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // EVALUACIONES RECIBIDAS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Evaluaciones recibidas de colaboradores (líder evaluó al colaborador)
+     * Devuelve una fila por evaluador con sus respuestas agrupadas
+     */
+    public function getEvaluacionesRecibidasColaborador(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT R.IDEMPLEADO_EVAL AS ID_EVALUADOR,
+                       NVL(EM.EMPLEADO, 'Anónimo') AS EVALUADOR,
+                       NVL(EM.CARGO, 'N/A') AS CARGO_EVALUADOR,
+                       R.IDCOMPETENCIA, R.VALOR, O.ETIQUETA,
+                       C.NUM_PREGUNTA, C.NOMBRE AS NOMBRE_COMP,
+                       TO_CHAR(MAX(R.FECHACONFIRMA),'DD/MM/YYYY') AS FECHACONFIRMA
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMOPCIONESCALA O ON R.IDOPCION = O.IDOPCION
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA  C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                LEFT  JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS EM
+                    ON R.IDEMPLEADO_EVAL = EM.IDEMPLEADO AND EM.ESPRINCIPAL = 1
+                WHERE R.IDEMPLEADO  = $idempleado
+                  AND R.TIPO_EVAL   = 'LIDER_A_COLAB'
+                  AND R.CONFIRMADO  = 1
+                  $filtro
+                GROUP BY R.IDEMPLEADO_EVAL, EM.EMPLEADO, EM.CARGO,
+                         R.IDCOMPETENCIA, R.VALOR, O.ETIQUETA, C.NUM_PREGUNTA, C.NOMBRE
+                ORDER BY R.IDEMPLEADO_EVAL, C.NUM_PREGUNTA";
+        $res  = $this->ejecutarConsulta($sql);
         $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $idEval = (int)$r['ID_EVALUADOR'];
+                if (!isset($rows[$idEval])) {
+                    $rows[$idEval] = [
+                        'ID_EVALUADOR'   => $idEval,
+                        'EVALUADOR'      => fromOracleEncoding($r['EVALUADOR']      ?? ''),
+                        'CARGO_EVALUADOR'=> fromOracleEncoding($r['CARGO_EVALUADOR']?? ''),
+                        'FECHACONFIRMA'  => $r['FECHACONFIRMA'],
+                        'RESPUESTAS'     => [],
+                    ];
+                }
+                $rows[$idEval]['RESPUESTAS'][(int)$r['IDCOMPETENCIA']] = [
+                    'VALOR'        => (int)$r['VALOR'],
+                    'ETIQUETA'     => fromOracleEncoding($r['ETIQUETA']    ?? ''),
+                    'NOMBRE_COMP'  => fromOracleEncoding($r['NOMBRE_COMP'] ?? ''),
+                    'NUM_PREGUNTA' => (int)$r['NUM_PREGUNTA'],
+                ];
+            }
+            oci_free_statement($res);
+        }
+        return array_values($rows);
+    }
+
+    /**
+     * Evaluaciones de liderazgo recibidas (colaboradores evaluaron al líder)
+     */
+    public function getEvaluacionesRecibidasLiderazgo(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT R.IDEMPLEADO_EVAL AS ID_EVALUADOR,
+                       NVL(EM.EMPLEADO, 'Anónimo') AS EVALUADOR,
+                       NVL(EM.CARGO, 'N/A') AS CARGO_EVALUADOR,
+                       R.IDCOMPETENCIA, R.VALOR, O.ETIQUETA,
+                       C.NUM_PREGUNTA, C.NOMBRE AS NOMBRE_COMP,
+                       TO_CHAR(MAX(R.FECHACONFIRMA),'DD/MM/YYYY') AS FECHACONFIRMA
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMOPCIONESCALA O ON R.IDOPCION = O.IDOPCION
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA  C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                LEFT  JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS EM
+                    ON R.IDEMPLEADO_EVAL = EM.IDEMPLEADO AND EM.ESPRINCIPAL = 1
+                WHERE R.IDEMPLEADO  = $idempleado
+                  AND R.TIPO_EVAL   = 'COLAB_A_LIDER'
+                  AND R.CONFIRMADO  = 1
+                  $filtro
+                GROUP BY R.IDEMPLEADO_EVAL, EM.EMPLEADO, EM.CARGO,
+                         R.IDCOMPETENCIA, R.VALOR, O.ETIQUETA, C.NUM_PREGUNTA, C.NOMBRE
+                ORDER BY R.IDEMPLEADO_EVAL, C.NUM_PREGUNTA";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $idEval = (int)$r['ID_EVALUADOR'];
+                if (!isset($rows[$idEval])) {
+                    $rows[$idEval] = [
+                        'ID_EVALUADOR'   => $idEval,
+                        'EVALUADOR'      => fromOracleEncoding($r['EVALUADOR']      ?? ''),
+                        'CARGO_EVALUADOR'=> fromOracleEncoding($r['CARGO_EVALUADOR']?? ''),
+                        'FECHACONFIRMA'  => $r['FECHACONFIRMA'],
+                        'RESPUESTAS'     => [],
+                    ];
+                }
+                $rows[$idEval]['RESPUESTAS'][(int)$r['IDCOMPETENCIA']] = [
+                    'VALOR'        => (int)$r['VALOR'],
+                    'ETIQUETA'     => fromOracleEncoding($r['ETIQUETA']    ?? ''),
+                    'NOMBRE_COMP'  => fromOracleEncoding($r['NOMBRE_COMP'] ?? ''),
+                    'NUM_PREGUNTA' => (int)$r['NUM_PREGUNTA'],
+                ];
+            }
+            oci_free_statement($res);
+        }
+        return array_values($rows);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // EVALUACIONES REALIZADAS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Evaluaciones realizadas a colaboradores (el líder evaluó a otros)
+     */
+    public function getEvaluacionesRealizadasColaborador(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT DISTINCT R.IDEMPLEADO AS ID_EVALUADO,
+                       NVL(EM.EMPLEADO, 'Desconocido') AS EVALUADO,
+                       NVL(EM.CARGO, 'N/A') AS CARGO_EVALUADO,
+                       TO_CHAR(MAX(R.FECHACONFIRMA) OVER (PARTITION BY R.IDEMPLEADO),'DD/MM/YYYY') AS FECHACONFIRMA
+                FROM VAADINWEB.HUMRESPUESTA R
+                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS EM
+                    ON R.IDEMPLEADO = EM.IDEMPLEADO AND EM.ESPRINCIPAL = 1
+                WHERE R.IDEMPLEADO_EVAL = $idempleado
+                  AND R.TIPO_EVAL       = 'LIDER_A_COLAB'
+                  AND R.CONFIRMADO      = 1
+                  $filtro
+                ORDER BY EVALUADO";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[] = $this->utf8Row($r);
+            }
+            oci_free_statement($res);
+        }
         return $rows;
     }
 
-    /*public function getEvaluacionesRecibidasLiderazgo($idempleado) {
-        $sql = "SELECT hl.IDAUTOLIDER, hl.CONFIRMADO, hl.FECHACONFIRMA, NVL(em.EMPLEADO,'Anónimo') AS EVALUADOR, NVL(em.CARGO,'N/A') AS CARGO_EVALUADOR
-                FROM VAADINWEB.HUMAUTOEVALUACIONLIDER hl
-                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEMPLEADOSCARGOS em ON hl.EMPLEADO_CONFIRMA = em.IDEMPLEADO
-                WHERE hl.EMPLEADO_ID = " . (int)$idempleado . " ORDER BY hl.FECHACONFIRMA DESC";
-        // NOTE: the LEFT JOIN alias in original code is ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS em, keep consistent
-        $sql = "SELECT hl.IDAUTOLIDER, hl.CONFIRMADO, hl.FECHACONFIRMA, NVL(em.EMPLEADO,'Anónimo') AS EVALUADOR, NVL(em.CARGO,'N/A') AS CARGO_EVALUADOR
-                FROM VAADINWEB.HUMAUTOEVALUACIONLIDER hl
-                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS em ON hl.EMPLEADO_CONFIRMA = em.IDEMPLEADO
-                WHERE hl.EMPLEADO_ID = " . (int)$idempleado . " ORDER BY hl.FECHACONFIRMA DESC";
-        $res = $this->ejecutarConsulta($sql);
+    /**
+     * Evaluaciones de liderazgo realizadas (colaborador evaluó a su líder)
+     */
+    public function getEvaluacionesRealizadasLiderazgo(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT DISTINCT R.IDEMPLEADO AS ID_EVALUADO,
+                       NVL(EM.EMPLEADO, 'Desconocido') AS EVALUADO,
+                       NVL(EM.CARGO, 'N/A') AS CARGO_EVALUADO,
+                       TO_CHAR(MAX(R.FECHACONFIRMA) OVER (PARTITION BY R.IDEMPLEADO),'DD/MM/YYYY') AS FECHACONFIRMA
+                FROM VAADINWEB.HUMRESPUESTA R
+                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS EM
+                    ON R.IDEMPLEADO = EM.IDEMPLEADO AND EM.ESPRINCIPAL = 1
+                WHERE R.IDEMPLEADO_EVAL = $idempleado
+                  AND R.TIPO_EVAL       = 'COLAB_A_LIDER'
+                  AND R.CONFIRMADO      = 1
+                  $filtro
+                ORDER BY EVALUADO";
+        $res  = $this->ejecutarConsulta($sql);
         $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
-        return $rows;
-    }*/
-
-    public function getEvaluacionesRecibidasLiderazgo($idempleado)
-{
-    $sql = "
-        SELECT
-            hl.IDAUTOLIDER, hl.CONFIRMADO, hl.FECHACONFIRMA,
-            /* Nombre del evaluador */
-            CASE
-                WHEN emc.IDEMPLEADO IS NOT NULL THEN emc.EMPLEADO
-                WHEN em.IDEMPLEADO IS NOT NULL  THEN em.EMPLEADO
-                ELSE 'EMPLEADO DESCONOCIDO'
-            END AS EVALUADOR,
-            /* Cargo del evaluador */
-            CASE
-                WHEN emc.IDEMPLEADO IS NOT NULL THEN emc.CARGO
-                WHEN em.IDEMPLEADO IS NOT NULL  THEN 'EMPLEADO (INACTIVO)'
-                ELSE 'N/A'
-            END AS CARGO_EVALUADOR
-        FROM VAADINWEB.HUMAUTOEVALUACIONLIDER hl
-        LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS emc ON hl.EMPLEADO_CONFIRMA = emc.IDEMPLEADO
-        LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOS em ON hl.EMPLEADO_CONFIRMA = em.IDEMPLEADO
-        WHERE hl.EMPLEADO_ID = " . (int)$idempleado . "
-        ORDER BY hl.FECHACONFIRMA DESC
-    ";
-
-    $res = $this->ejecutarConsulta($sql);
-
-    $rows = [];
-    while ($r = oci_fetch_assoc($res)) {
-        $rows[] = $r;
-    }
-
-    return $rows;
-}
-
-
-    public function getEvaluacionesRealizadasColaborador($idempleado) {
-        $sql = "SELECT d.IDEVACOLABORADOR, d.PREGUNTA1, d.PREGUNTA2, d.PREGUNTA3, d.PREGUNTA4, d.PREGUNTA5, d.PREGUNTA6, d.PREGUNTA7, d.PREGUNTA8, d.PREGUNTA9, d.PREGUNTA10, d.PREGUNTA11, em.EMPLEADO AS EVALUADO, em.CARGO AS CARGO_EVALUADO, d.CONFIRMADO, d.FECHACONFIRMA
-                FROM VAADINWEB.HUMEVALUACIONCOLABO d
-                INNER JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS em ON d.EMPLEADO_ID = em.IDEMPLEADO
-                WHERE d.EMPLEADO_CONFIRMA = " . (int)$idempleado . " ORDER BY d.IDEVACOLABORADOR DESC";
-        $res = $this->ejecutarConsulta($sql);
-        $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[] = $this->utf8Row($r);
+            }
+            oci_free_statement($res);
+        }
         return $rows;
     }
 
-    public function getEvaluacionesRealizadasLiderazgo($idempleado) {
-        $sql = "SELECT hl.IDAUTOLIDER, hl.PREGUNTA1, hl.PREGUNTA2, hl.PREGUNTA3, hl.PREGUNTA4, hl.PREGUNTA5, hl.PREGUNTA6, hl.PREGUNTA7, hl.PREGUNTA8, em.EMPLEADO AS EVALUADO, em.CARGO AS CARGO_EVALUADO, hl.CONFIRMADO, hl.FECHACONFIRMA
-                FROM VAADINWEB.HUMAUTOEVALUACIONLIDER hl
-                INNER JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS em ON hl.EMPLEADO_ID = em.IDEMPLEADO
-                WHERE hl.EMPLEADO_CONFIRMA = " . (int)$idempleado . " ORDER BY hl.FECHACONFIRMA DESC";
-        $res = $this->ejecutarConsulta($sql);
+
+    /**
+     * Calificaciones que dio el evaluador actual a un colaborador específico
+     */
+    public function getCalificacionesRealizadas(int $idEvaluador, int $idEvaluado, string $tipoEval, ?array $periodo = null): array {
+        $tipoEval = in_array($tipoEval, ['LIDER_A_COLAB','COLAB_A_LIDER']) ? $tipoEval : 'LIDER_A_COLAB';
+        $filtro   = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT C.NOMBRE AS NOMBRE_COMP,
+                       C.NUM_PREGUNTA,
+                       R.VALOR
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                WHERE R.IDEMPLEADO_EVAL = $idEvaluador
+                  AND R.IDEMPLEADO      = $idEvaluado
+                  AND R.TIPO_EVAL       = '$tipoEval'
+                  AND R.CONFIRMADO      = 1
+                  $filtro
+                ORDER BY C.NUM_PREGUNTA";
+        $res  = $this->ejecutarConsulta($sql);
         $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $r['NOMBRE_COMP'] = fromOracleEncoding($r['NOMBRE_COMP'] ?? '');
+                $rows[] = $r;
+            }
+            oci_free_statement($res);
+        }
         return $rows;
     }
 
-    public function getLatestAutoAndLider($idempleado) {
-        $resultado = [
-            'auto' => null,
-            'lider' => null
-        ];
+    // ══════════════════════════════════════════════════════════════════════════
+    // INDICADORES Y PROMEDIOS
+    // ══════════════════════════════════════════════════════════════════════════
 
-        $sqlAuto = "SELECT * FROM (SELECT PREGUNTA1, PREGUNTA2, PREGUNTA3, PREGUNTA4, PREGUNTA5, PREGUNTA6, PREGUNTA7, PREGUNTA8, PREGUNTA9, PREGUNTA10, PREGUNTA11, FECHAREALIZA FROM VAADINWEB.HUMAUTOEVALUACION WHERE EMPLEADO_ID = " . (int)$idempleado . " ORDER BY FECHAREALIZA DESC) WHERE ROWNUM = 1";
-        $resA = $this->ejecutarConsulta($sqlAuto);
-        $resultado['auto'] = oci_fetch_assoc($resA) ?: null;
+    /**
+     * Indicadores de desempeño — promedios por competencia (1-11)
+     * recibidos de evaluadores (LIDER_A_COLAB)
+     * [IDCOMPETENCIA => ['PROMEDIO'=>3.5, 'NUM_PREGUNTA'=>1, 'NOMBRE_COMP'=>'...']]
+     */
+    public function getIndicadoresDesempeno(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT R.IDCOMPETENCIA,
+                       ROUND(AVG(R.VALOR), 2) AS PROMEDIO,
+                       COUNT(*)               AS TOTAL_EVAL,
+                       C.NUM_PREGUNTA,
+                       C.NOMBRE               AS NOMBRE_COMP
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                WHERE R.IDEMPLEADO  = $idempleado
+                  AND R.TIPO_EVAL   = 'LIDER_A_COLAB'
+                  AND R.CONFIRMADO  = 1
+                  AND C.NUM_PREGUNTA BETWEEN 1 AND 11
+                  $filtro
+                GROUP BY R.IDCOMPETENCIA, C.NUM_PREGUNTA, C.NOMBRE
+                ORDER BY C.NUM_PREGUNTA";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[(int)$r['IDCOMPETENCIA']] = [
+                    'PROMEDIO'    => (float)str_replace(',', '.', $r['PROMEDIO']),
+                    'TOTAL_EVAL'  => (int)$r['TOTAL_EVAL'],
+                    'NUM_PREGUNTA'=> (int)$r['NUM_PREGUNTA'],
+                    'NOMBRE_COMP' => fromOracleEncoding($r['NOMBRE_COMP'] ?? ''),
+                ];
+            }
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
 
-        $sqlLider = "SELECT * FROM (SELECT PREGUNTA1, PREGUNTA2, PREGUNTA3, PREGUNTA4, PREGUNTA5, PREGUNTA6, PREGUNTA7, PREGUNTA8, FECHACONFIRMA FROM VAADINWEB.HUMAUTOEVALUACIONLIDER WHERE EMPLEADO_ID = " . (int)$idempleado . " ORDER BY FECHACONFIRMA DESC) WHERE ROWNUM = 1";
-        $resL = $this->ejecutarConsulta($sqlLider);
-        $resultado['lider'] = oci_fetch_assoc($resL) ?: null;
+    /**
+     * Indicadores de liderazgo — promedios por competencia (12-16)
+     * recibidos de colaboradores (COLAB_A_LIDER)
+     */
+    public function getIndicadoresLiderazgo(int $idempleado, ?array $periodo = null): array {
+        $filtro = $this->filtroPeriodo($periodo, 'R.FECHACONFIRMA');
+        $sql = "SELECT R.IDCOMPETENCIA,
+                       ROUND(AVG(R.VALOR), 2) AS PROMEDIO,
+                       COUNT(*)               AS TOTAL_EVAL,
+                       C.NUM_PREGUNTA,
+                       C.NOMBRE               AS NOMBRE_COMP
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                WHERE R.IDEMPLEADO  = $idempleado
+                  AND R.TIPO_EVAL   = 'COLAB_A_LIDER'
+                  AND R.CONFIRMADO  = 1
+                  AND C.NUM_PREGUNTA BETWEEN 12 AND 16
+                  $filtro
+                GROUP BY R.IDCOMPETENCIA, C.NUM_PREGUNTA, C.NOMBRE
+                ORDER BY C.NUM_PREGUNTA";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[(int)$r['IDCOMPETENCIA']] = [
+                    'PROMEDIO'    => (float)str_replace(',', '.', $r['PROMEDIO']),
+                    'TOTAL_EVAL'  => (int)$r['TOTAL_EVAL'],
+                    'NUM_PREGUNTA'=> (int)$r['NUM_PREGUNTA'],
+                    'NOMBRE_COMP' => fromOracleEncoding($r['NOMBRE_COMP'] ?? ''),
+                ];
+            }
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
+
+    /**
+     * Devuelve auto y lider más recientes para comparativa
+     * Reemplaza getLatestAutoAndLider() — ahora devuelve promedios
+     */
+    public function getLatestAutoAndLider(int $idempleado): array {
+        $resultado = ['auto' => [], 'lider' => []];
+        $periodo   = $this->getPeriodoActivo();
+
+        $resultado['auto']  = $this->getAutoEvaluacion($idempleado, $periodo);
+        $resultado['lider'] = $this->getIndicadoresDesempeno($idempleado, $periodo);
 
         return $resultado;
     }
 
-    public function getIndicadoresDesempeno($idempleado) {
-        $sql = "SELECT PREGUNTA1, PREGUNTA2, PREGUNTA3, PREGUNTA4, PREGUNTA5, PREGUNTA6, PREGUNTA7, PREGUNTA8, PREGUNTA9, PREGUNTA10, PREGUNTA11 FROM VAADINWEB.HUMEVALUACIONCOLABO WHERE EMPLEADO_ID = " . (int)$idempleado;
-        $res = $this->ejecutarConsulta($sql);
+    // ══════════════════════════════════════════════════════════════════════════
+    // EVALUADORES
+    // ══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Lista de evaluadores únicos que han evaluado a un empleado
+     * Reemplaza obtenerEvaluadores() — una sola consulta a HUMRESPUESTA
+     */
+    public function obtenerEvaluadores(int $idempleado): array {
+        $sql = "SELECT DISTINCT R.IDEMPLEADO_EVAL AS ID_EVALUADOR,
+                       NVL(EM.EMPLEADO, 'Desconocido') AS EMPLEADO,
+                       NVL(EM.CARGO, 'N/A') AS CARGO,
+                       TO_CHAR(MAX(R.FECHACONFIRMA) OVER (PARTITION BY R.IDEMPLEADO_EVAL),'DD/MM/YYYY') AS FECHACONFIRMA
+                FROM VAADINWEB.HUMRESPUESTA R
+                LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS EM
+                    ON R.IDEMPLEADO_EVAL = EM.IDEMPLEADO AND EM.ESPRINCIPAL = 1
+                WHERE R.IDEMPLEADO  = $idempleado
+                  AND R.CONFIRMADO  = 1
+                ORDER BY EMPLEADO";
+        $res  = $this->ejecutarConsulta($sql);
         $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
-        return $rows;
-    }
-
-    public function getIndicadoresLiderazgo($idempleado) {
-        $sql = "SELECT PREGUNTA1, PREGUNTA2, PREGUNTA3, PREGUNTA4, PREGUNTA5, PREGUNTA6, PREGUNTA7, PREGUNTA8 FROM VAADINWEB.HUMAUTOEVALUACIONLIDER WHERE EMPLEADO_ID = " . (int)$idempleado;
-        $res = $this->ejecutarConsulta($sql);
-        $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
-        return $rows;
-    }
-/*
-    public function obtenerEvaluadores($idempleado) {
-    $idEmpleadoBusca = (int)$idempleado;
-    // Mantenemos tu lógica de UNION
-    $sql = "SELECT * FROM ( 
-                SELECT C.EMPLEADO_CONFIRMA AS ID_EVALUADOR, C.FECHACONFIRMA 
-                FROM VAADINWEB.HUMEVALUACIONCOLABO C 
-                WHERE C.EMPLEADO_ID = $idEmpleadoBusca 
-                UNION ALL 
-                SELECT L.EMPLEADO_CONFIRMA AS ID_EVALUADOR, L.FECHACONFIRMA 
-                FROM VAADINWEB.HUMAUTOEVALUACIONLIDER L 
-                WHERE L.EMPLEADO_ID = $idEmpleadoBusca 
-                ORDER BY FECHACONFIRMA DESC 
-            ) T WHERE ROWNUM <= 100"; // Bajamos a 100 para que el histórico no sea gigante
-
-    $res = $this->ejecutarConsulta($sql);
-    $evaluadorIds = [];
-    $evaluadores = [];
-
-        if ($res !== false) {
-            while ($eval = oci_fetch_assoc($res)) { 
-                $evaluadorIds[$eval['ID_EVALUADOR']] = $eval; 
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[] = $this->utf8Row($r);
             }
             oci_free_statement($res);
-
-            if (!empty($evaluadorIds)) {
-                $idsParaIn = implode(',', array_keys($evaluadorIds));
-                $sqlEmpleados = "SELECT IDEMPLEADO, EMPLEADO, CARGO FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS WHERE IDEMPLEADO IN ($idsParaIn)";
-                $resEm = $this->ejecutarConsulta($sqlEmpleados);
-
-                if ($resEm !== false) {
-                    $datosEm = [];
-                    while ($emp = oci_fetch_assoc($resEm)) { 
-                        // Convertimos a UTF-8 para evitar errores de visualización
-                        $emp['EMPLEADO'] = mb_convert_encoding($emp['EMPLEADO'], 'UTF-8', 'ISO-8859-1');
-                        $emp['CARGO'] = mb_convert_encoding($emp['CARGO'], 'UTF-8', 'ISO-8859-1');
-                        $datosEm[$emp['IDEMPLEADO']] = $emp; 
-                    }
-                    
-                    foreach ($evaluadorIds as $id => $data) {
-                        if (isset($datosEm[$id])) {
-                            $evaluadores[] = array_merge($datosEm[$id], ['FECHACONFIRMA' => $data['FECHACONFIRMA']]);
-                        }
-                    }
-                    oci_free_statement($resEm);
-                }
-            }
         }
-        return $evaluadores;
-    }
-*/
-
-public function obtenerEvaluadores($idempleado)
-{
-    $idEmpleadoBusca = (int)$idempleado;
-
-    // 1 IDs de evaluadores (obtenidos de ambas tablas)
-    $sql = "
-        SELECT * FROM (
-            SELECT C.EMPLEADO_CONFIRMA AS ID_EVALUADOR, C.FECHACONFIRMA
-            FROM VAADINWEB.HUMEVALUACIONCOLABO C
-            WHERE C.EMPLEADO_ID = $idEmpleadoBusca
-
-            UNION ALL
-
-            SELECT L.EMPLEADO_CONFIRMA AS ID_EVALUADOR, L.FECHACONFIRMA
-            FROM VAADINWEB.HUMAUTOEVALUACIONLIDER L
-            WHERE L.EMPLEADO_ID = $idEmpleadoBusca
-
-            ORDER BY FECHACONFIRMA DESC
-        )
-        WHERE ROWNUM <= 100
-    ";
-
-    $res = $this->ejecutarConsulta($sql);
-
-    $evaluadorIds = [];
-    $evaluadores   = [];
-
-    if ($res !== false) {
-        while ($eval = oci_fetch_assoc($res)) {
-            $evaluadorIds[$eval['ID_EVALUADOR']] = $eval;
-        }
-        oci_free_statement($res);
-    }
-
-    if (empty($evaluadorIds)) {
-        return [];
-    }
-
-    $idsParaIn = implode(',', array_keys($evaluadorIds));
-
-    // 2 Empleados ACTIVOS (nombre + cargo)
-    $sqlActivos = "
-        SELECT IDEMPLEADO, EMPLEADO, CARGO
-        FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS
-        WHERE IDEMPLEADO IN ($idsParaIn)
-    ";
-
-    $resActivos = $this->ejecutarConsulta($sqlActivos);
-    $empleadosActivos = [];
-
-    if ($resActivos !== false) {
-        while ($emp = oci_fetch_assoc($resActivos)) {
-            $emp['EMPLEADO'] = mb_convert_encoding($emp['EMPLEADO'], 'UTF-8', 'ISO-8859-1');
-            $emp['CARGO']    = mb_convert_encoding($emp['CARGO'], 'UTF-8', 'ISO-8859-1');
-            $empleadosActivos[$emp['IDEMPLEADO']] = $emp;
-        }
-        oci_free_statement($resActivos);
-    }
-
-    // 3 Empleados INACTIVOS (solo nombre)
-    $sqlTodos = "
-        SELECT IDEMPLEADO, EMPLEADO
-        FROM ZAYMAWEB.VST_GHEMPEMPLEADOS
-        WHERE IDEMPLEADO IN ($idsParaIn)
-    ";
-
-    $resTodos = $this->ejecutarConsulta($sqlTodos);
-    $empleadosTodos = [];
-
-    if ($resTodos !== false) {
-        while ($emp = oci_fetch_assoc($resTodos)) {
-            $emp['EMPLEADO'] = mb_convert_encoding($emp['EMPLEADO'], 'UTF-8', 'ISO-8859-1');
-            $empleadosTodos[$emp['IDEMPLEADO']] = $emp;
-        }
-        oci_free_statement($resTodos);
-    }
-
-    // 4 Construcción final (regla de negocio)
-    foreach ($evaluadorIds as $id => $data) {
-
-        if (isset($empleadosActivos[$id])) {
-            // Activo
-            $evaluadores[] = [
-                'IDEMPLEADO'   => $id,
-                'EMPLEADO'     => $empleadosActivos[$id]['EMPLEADO'],
-                'CARGO'        => $empleadosActivos[$id]['CARGO'],
-                'FECHACONFIRMA'=> $data['FECHACONFIRMA']
-            ];
-
-        } elseif (isset($empleadosTodos[$id])) {
-            // Inactivo
-            $evaluadores[] = [
-                'IDEMPLEADO'   => $id,
-                'EMPLEADO'     => $empleadosTodos[$id]['EMPLEADO'],
-                'CARGO'        => 'EMPLEADO (INACTIVO)',
-                'FECHACONFIRMA'=> $data['FECHACONFIRMA']
-            ];
-        }
-    }
-
-    return $evaluadores;
-}
-
-    public function searchEmployees($term, $limit = 10) {
-        $searchTermUpper = strtoupper($term);
-        $sql = "SELECT * FROM ( SELECT e.IDEMPLEADO, e.EMPLEADO, e.IDENTIFICACION, e.CARGO FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS e WHERE UPPER(e.EMPLEADO) LIKE '%$searchTermUpper%' OR e.IDENTIFICACION LIKE '%$searchTermUpper%' ORDER BY e.EMPLEADO ASC ) WHERE ROWNUM <= " . (int)$limit;
-        $res = $this->ejecutarConsulta($sql);
-        $rows = [];
-        while ($r = oci_fetch_assoc($res)) { $rows[] = $r; }
         return $rows;
     }
 
-    public function getEmployeeById($id) {
-        $sql = "SELECT EMPLEADO, CARGO, IDENTIFICACION FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS WHERE IDEMPLEADO = " . (int)$id;
-        $res = $this->ejecutarConsulta($sql);
-        return oci_fetch_assoc($res) ?: null;
-    }
-  
-    public function buscarPersonalEquipo($term) {
-    $term = strtoupper(trim($term));
-    // Consulta para buscar en la vista de empleados
-    $sql = "SELECT * FROM (
-                SELECT IDEMPLEADO, EMPLEADO, IDENTIFICACION, CARGO 
-                FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS 
-                WHERE (UPPER(EMPLEADO) LIKE '%$term%' OR IDENTIFICACION LIKE '%$term%')
-                AND ESTADOEMPLEADO = 1 AND CARGO IS NOT NULL
-                ORDER BY EMPLEADO ASC
-            ) WHERE ROWNUM <= 10";
-    
-    $res = $this->ejecutarConsulta($sql);
-    $resultados = [];
-    if($res) {
-        while($row = oci_fetch_assoc($res)) {
-            $resultados[] = $row;
-        }
-        oci_free_statement($res);
-    }
-    return $resultados;
-}
-}
-?>
+    // ══════════════════════════════════════════════════════════════════════════
+    // EQUIPO A CARGO
+    // ══════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Estado del equipo a cargo — ahora lee HUMRESPUESTA
+     * TIENE_AUTOEVAL: el colaborador hizo su AUTO
+     * TIENE_EVAL_COLAB: el líder ya lo evaluó (LIDER_A_COLAB)
+     */
+    public function getEquipoACargo(int $idempleado, string $nivelCargo, ?array $periodo = null): array {
+        $idempleado = (int)$idempleado;
+        $filtroAuto  = "R_A.CONFIRMADO = 1";
+        $filtroColab = "R_C.CONFIRMADO = 1";
+        if ($periodo) {
+            $idP         = (int)$periodo['IDPERIODO'];
+            $filtroAuto  = "R_A.CONFIRMADO = 1 AND R_A.IDPERIODO = $idP";
+            $filtroColab = "R_C.CONFIRMADO = 1 AND R_C.IDPERIODO = $idP";
+        }
+
+        // Usar HUMEMPLEADOEVAL — fuente oficial desde Excel del director
+        $subQueryPersonas = "
+            SELECT HE.IDEMPLEADO,
+                   NVL(GE.PNOMBRE||' '||NVL(GE.SNOMBRE||' ','')||GE.PAPELLIDO||' '||NVL(GE.SAPELLIDO,''),
+                       HE.NOMBRE) AS EMPLEADO,
+                   HE.CARGO,
+                   NVL(VC.CODNIVELCARGO,'NC001') AS CODNIVELCARGO,
+                   NVL(VC.IDDEPENDENCIA, 0) AS IDDEPENDENCIA,
+                   HE.PROCESO AS DEPENDENCIA
+            FROM VAADINWEB.HUMEMPLEADOEVAL HE
+            LEFT JOIN ZAYMAWEB.GHEMPEMPLEADOS GE ON HE.IDEMPLEADO = GE.IDEMPLEADO
+            LEFT JOIN ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS VC
+                ON HE.IDEMPLEADO = VC.IDEMPLEADO AND VC.ESPRINCIPAL = 1
+            WHERE HE.IDEMPLEADO_EVAL = $idempleado
+              AND HE.ACTIVO = 1
+              AND HE.IDROL IN (1, 2, 3)";
+
+        $sql = "
+            SELECT
+                E.IDEMPLEADO, E.EMPLEADO, E.CARGO, E.CODNIVELCARGO, E.DEPENDENCIA,
+                CASE WHEN A.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS TIENE_AUTOEVAL,
+                CASE WHEN C.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS TIENE_EVAL_COLAB,
+                CASE
+                    WHEN A.IDEMPLEADO IS NOT NULL AND C.IDEMPLEADO IS NOT NULL THEN 'completo'
+                    WHEN A.IDEMPLEADO IS NOT NULL THEN 'en_progreso'
+                    ELSE 'sin_iniciar'
+                END AS ESTADO
+            FROM ($subQueryPersonas) E
+            LEFT JOIN (
+                SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA R_A
+                WHERE R_A.TIPO_EVAL = 'AUTO' AND $filtroAuto
+            ) A ON E.IDEMPLEADO = A.IDEMPLEADO
+            LEFT JOIN (
+                SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA R_C
+                WHERE R_C.TIPO_EVAL = 'LIDER_A_COLAB'
+                  AND R_C.IDEMPLEADO_EVAL = $idempleado AND $filtroColab
+            ) C ON E.IDEMPLEADO = C.IDEMPLEADO
+            ORDER BY
+                CASE
+                    WHEN A.IDEMPLEADO IS NULL THEN 1
+                    WHEN A.IDEMPLEADO IS NOT NULL AND C.IDEMPLEADO IS NULL THEN 2
+                    ELSE 3
+                END, E.EMPLEADO ASC";
+
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[] = $this->utf8Row($r);
+            }
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MÉTODOS SIN CAMBIO — no usan tablas V1
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function getCargoId(int $idempleado): ?int {
+        $sql = "SELECT IDEMPCARGO FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS
+                WHERE IDEMPLEADO = $idempleado AND ESPRINCIPAL = 1 AND ROWNUM = 1";
+        $res = $this->ejecutarConsulta($sql);
+        $row = $res ? oci_fetch_assoc($res) : null;
+        if ($res) oci_free_statement($res);
+        return $row ? (int)$row['IDEMPCARGO'] : null;
+    }
+
+    public function getLiderDeColaborador(int $idempleado): ?array {
+        // Usar HUMEMPLEADOEVAL — IDEMPLEADO_EVAL es el jefe directo
+        $sql = "SELECT HE_L.IDEMPLEADO, HE_L.NOMBRE AS EMPLEADO, HE_L.CARGO,
+                       GE.EMAIL
+                FROM VAADINWEB.HUMEMPLEADOEVAL HE_C
+                JOIN VAADINWEB.HUMEMPLEADOEVAL HE_L
+                    ON HE_C.IDEMPLEADO_EVAL = HE_L.IDEMPLEADO
+                LEFT JOIN ZAYMAWEB.GHEMPEMPLEADOS GE ON HE_L.IDEMPLEADO = GE.IDEMPLEADO
+                WHERE HE_C.IDEMPLEADO = $idempleado
+                  AND HE_C.ACTIVO = 1 AND HE_L.ACTIVO = 1
+                  AND ROWNUM = 1";
+        $res = $this->ejecutarConsulta($sql);
+        $row = $res ? oci_fetch_assoc($res) : null;
+        if ($res) oci_free_statement($res);
+        if ($row) {
+            $row['EMPLEADO'] = fromOracleEncoding($row['EMPLEADO'] ?? '');
+            $row['CARGO']    = fromOracleEncoding($row['CARGO']    ?? '');
+        }
+        return $row;
+    }
+
+    public function searchEmployees(string $term, int $limit = 10): array {
+        $term = strtoupper($term);
+        $sql  = "SELECT * FROM (
+                    SELECT e.IDEMPLEADO, e.EMPLEADO, e.IDENTIFICACION, e.CARGO
+                    FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS e
+                    WHERE UPPER(e.EMPLEADO) LIKE '%$term%' OR e.IDENTIFICACION LIKE '%$term%'
+                    ORDER BY e.EMPLEADO ASC
+                 ) WHERE ROWNUM <= $limit";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) $rows[] = $this->utf8Row($r);
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
+
+    public function getEmployeeById(int $id): ?array {
+        $sql = "SELECT EMPLEADO, CARGO, IDENTIFICACION
+                FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS
+                WHERE IDEMPLEADO = $id AND ESPRINCIPAL = 1 AND ROWNUM = 1";
+        $res = $this->ejecutarConsulta($sql);
+        $row = $res ? oci_fetch_assoc($res) : null;
+        if ($res) oci_free_statement($res);
+        return $row ? $this->utf8Row($row) : null;
+    }
+
+    /**
+     * Promedios de autoevaluación por empleado — para columna admin en Mi Equipo
+     * Solo visible para usuarios con puedeVerDetalle = 1
+     * [IDEMPLEADO => promedio_auto]
+     */
+    public function getPromediosAutoEquipo(array $idsEmpleados, ?array $periodo = null): array {
+        if (empty($idsEmpleados)) return [];
+
+        $ids       = implode(',', array_map('intval', $idsEmpleados));
+        $idPeriodo = $periodo ? (int)$periodo['IDPERIODO'] : 0;
+        $filtroPer = $idPeriodo ? "AND R.IDPERIODO = $idPeriodo" : '';
+
+        $sql = "SELECT R.IDEMPLEADO,
+                       ROUND(AVG(R.VALOR * 1.0), 2) AS PROMEDIO
+                FROM VAADINWEB.HUMRESPUESTA R
+                INNER JOIN VAADINWEB.HUMCOMPETENCIA C ON R.IDCOMPETENCIA = C.IDCOMPETENCIA
+                WHERE R.IDEMPLEADO IN ($ids)
+                  AND R.IDEMPLEADO_EVAL = R.IDEMPLEADO
+                  AND R.TIPO_EVAL       = 'AUTO'
+                  AND R.CONFIRMADO      = 1
+                  AND C.NUM_PREGUNTA   <= 11
+                  $filtroPer
+                GROUP BY R.IDEMPLEADO";
+
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                $rows[(int)$r['IDEMPLEADO']] = (float)str_replace(',', '.', $r['PROMEDIO']);
+            }
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
+
+    public function buscarPersonalEquipo(string $term): array {
+        $term = strtoupper(trim($term));
+        $sql  = "SELECT * FROM (
+                    SELECT IDEMPLEADO, EMPLEADO, IDENTIFICACION, CARGO
+                    FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS
+                    WHERE (UPPER(EMPLEADO) LIKE '%$term%' OR IDENTIFICACION LIKE '%$term%')
+                      AND ESTADOEMPLEADO = 1 AND CARGO IS NOT NULL
+                    ORDER BY EMPLEADO ASC
+                 ) WHERE ROWNUM <= 10";
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) $rows[] = $this->utf8Row($r);
+            oci_free_statement($res);
+        }
+        return $rows;
+    }
+}

@@ -13,9 +13,8 @@
             $username = DB_USER;
             $password = DB_PASSWORD;
 
-                $cadenaConexion = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$host)(PORT=$port))(CONNECT_DATA=(SID=$dbname)))";
-    $conexion = oci_connect($username, $password, $cadenaConexion);
-            
+            $cadenaConexion = "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=$host)(PORT=$port))(CONNECT_DATA=(SID=$dbname)))";
+            $conexion = oci_connect($username, $password, $cadenaConexion);
             
             if (!$conexion) {
                 $e = oci_error();
@@ -25,6 +24,16 @@
 
 			return $conexion;
 		}
+
+        /** Convierte UTF-8 a Windows-1252 para insertar en Oracle WE8MSWIN1252 */
+        protected function toOracle(string $str): string {
+            return mb_convert_encoding(trim($str), 'Windows-1252', 'UTF-8');
+        }
+
+        /** Convierte Windows-1252 a UTF-8 al leer de Oracle */
+        protected function fromOracle(string $str): string {
+            return mb_convert_encoding($str, 'UTF-8', 'Windows-1252');
+        }
 
         /*---------- Ejecutar consulta ----------*/
         protected function ejecutarConsulta($consulta){
@@ -37,6 +46,51 @@
             }
             
             return $query;
+        }
+
+        /*---------- Ejecutar consulta y convertir resultado a UTF-8 ----------*/
+        protected function ejecutarConsultaUTF8($consulta){
+            $query = $this->ejecutarConsulta($consulta);
+            if (!$query) return false;
+            
+            $rows = [];
+            while ($row = oci_fetch_assoc($query)) {
+                // Convertir cada campo de Windows-1252 a UTF-8
+                $convertedRow = [];
+                foreach ($row as $key => $value) {
+                    if (is_string($value)) {
+                        $convertedRow[$key] = fromOracleEncoding($value);
+                    } else {
+                        $convertedRow[$key] = $value;
+                    }
+                }
+                $rows[] = $convertedRow;
+            }
+            oci_free_statement($query);
+            return $rows;
+        }
+
+        /*---------- Ejecutar consulta y obtener un solo registro convertido ----------*/
+        protected function ejecutarConsultaUnicaUTF8($consulta){
+            $query = $this->ejecutarConsulta($consulta);
+            if (!$query) return null;
+            
+            $row = oci_fetch_assoc($query);
+            if ($row) {
+                // Convertir cada campo de Windows-1252 a UTF-8
+                $convertedRow = [];
+                foreach ($row as $key => $value) {
+                    if (is_string($value)) {
+                        $convertedRow[$key] = fromOracleEncoding($value);
+                    } else {
+                        $convertedRow[$key] = $value;
+                    }
+                }
+                oci_free_statement($query);
+                return $convertedRow;
+            }
+            oci_free_statement($query);
+            return null;
         }
 
         /*---------- Limpiar cadena de texto ----------*/
@@ -81,14 +135,11 @@
             }
         }
 
-
         /*---------- Eliminar registro con consulta preparada ----------*/
         protected function eliminarRegistro($conn,$tabla,$campo,$id){
             $consulta = "DELETE FROM $tabla WHERE $campo=$id";
-
             $sql=oci_parse($conn,$consulta);
             oci_execute($sql);
-
             return $sql;
         }
 
@@ -98,18 +149,13 @@
                     A.EMAIL
                 FROM VAADINWEB.AUDIUSUARIOS A
             ";
-
             $query = oci_parse($conn, $usuarios);
             oci_execute($query);
             $usuarios = [];
-
             while ($row = oci_fetch_assoc($query)) {
                 $usuarios[] = $row;
             }
-        
             oci_free_statement($query);
             return $usuarios;
         }
-
-
 }

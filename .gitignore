@@ -1,5 +1,6 @@
 # Dependencias
 /vendor/
+/node_modules/
 
 # Archivos de entorno
 .env
@@ -7,24 +8,31 @@
 
 # Logs
 *.log
+fb_debug.txt
 
 # Caché / temporales
 /tmp/
 /cache/
 
-# Archivos del sistema
+# Archivos sistema
 .DS_Store
 Thumbs.db
 
 # VS Code
 .vscode/
 
+# Claude Code
+.claude/
+
+# Scripts temporales pruebas
+test_encoding_session.php
+verificar_encoding.php
+
 # XAMPP
 htdocs/
 
+# Temporales
 .tmp.driveupload/
 
+# Comprimidos
 *.zip
-/vendor/
-.env
-*.log

@@ -8,7 +8,8 @@
             $listaBlanca = [
                 "home", "user", "logout", "evaluarList",
                 "evaluacionLiderazgo", "autoEvaluacion",
-                "subEvaluacion", "usuariosList","seguridad", "reportes"
+                "subEvaluacion", "usuariosList","seguridad", "reportes", "feedback",
+                "experienciaAzulLider", "experienciaAzulColab"
             ];
 
             $basePath = dirname(__DIR__) . "/views/content/";

@@ -1,818 +1,1151 @@
 <?php
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['empleadoevaluado'])) {
-        $_SESSION['empleadoevaluado'] = $_POST['empleadoevaluado'];
-    }
-
-    $idempleado = isset($_SESSION['empleadoevaluado']) ? $_SESSION['empleadoevaluado'] : '';
+use app\models\competenciaModel;
+$tooltipDesc = [];
+try {
+    $compModeloTooltip = new competenciaModel();
+    $tooltipDesc       = $compModeloTooltip->getOpcionesCompetencia();
+} catch (Exception $e) {
+    $tooltipDesc = [];
+}
 ?>
 
-<main class="h-screen w-full">
-    <div class="container full-container py-5">
-        <div class="flex justify-center w-full">
-                <form id="evaluationForm" class="FormularioAjax" action="<?php echo APP_URL; ?>app/ajax/formulariosAjax.php" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="modulo_evaluacion" value="registrarEvaluacionColaborador">
-                    <input type="hidden" name="empleadoevaluado" value="<?php echo $idempleado; ?>">
+<style>
+:root {
+    --ev-accent:   #005EB8;
+    --ev-accent2:  #0074E0;
+    --ev-bg:       #f8fafc;
+    --ev-card:     #ffffff;
+    --ev-border:   #e2e8f0;
+    --ev-muted:    #64748b;
+    --ev-text:     #1e293b;
+    --ev-success:  #059669;
+    --ev-warning:  #d97706;
+    --ev-radius:   16px;
+}
 
-                    <div class="section active" id="section1" style="text-align: center;">
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Calidez Humana y Servicio con Propósito</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿El evaluado refleja cercanía y disposición en su atención, ofreciendo un servicio humanizado que priorice las necesidades y el bienestar de los demás con un compromiso genuino?</p>
-                            <div class="options mt-5">
-								<div class="option-container">
-									<button type="button" class="option-button" onclick="selectOption(this, 'section1', 'Sobresaliente')">Sobresaliente</button>
-									<button type="button" class="info-button" onclick="openModal('modalSobresaliente')">?</button>
-									<!-- Modal para la opción "Sobresaliente" -->
-									<div id="modalSobresaliente" class="modal">
-										<div class="modal-content">
-											<span class="close" onclick="closeModal('modalSobresaliente')">&times;</span>
-											<p>El colaborador supera las expectativas, demuestra un compromiso excepcional con este principio y sus valores, y actúa de manera proactiva, inspirando a otros con su actitud y resultados.</p>
-										</div>
-									</div>
-								</div>
-								<div class="option-container">
-									<button type="button" class="option-button" onclick="selectOption(this, 'section1', 'Acorde')">Acorde</button>
-									<button type="button" class="info-button" onclick="openModal('modalAcorde')">?</button>
-								</div>
-								<!-- Modal para la opción "Sobresaliente" -->
-								<div id="modalAcorde" class="modal">
-									<div class="modal-content">
-										<span class="close" onclick="closeModal('modalAcorde')">&times;</span>
-										<p>El colaborador cumple consistentemente con las expectativas, refleja un alineamiento sólido con el principio y sus valores, y ocasionalmente toma la iniciativa para mejorar y aportar soluciones innovadoras.</p>
-									</div>
-								</div>
-								<div class="option-container">
-									<button type="button" class="option-button" onclick="selectOption(this, 'section1', 'Aceptable')">Aceptable</button>
-									<button type="button" class="info-button" onclick="openModal('modalAceptable')">?</button>
-								</div>
-								<!-- Modal para la opción "Sobresaliente" -->
-								<div id="modalAceptable" class="modal">
-									<div class="modal-content">
-										<span class="close" onclick="closeModal('modalAceptable')">&times;</span>
-										<p>El colaborador cumple con las expectativas básicas. Aunque actúa acorde al principio y sus valores, hay áreas donde podría ser más proactivo o comprometido.</p>
-									</div>
-								</div>
-								<div class="option-container">
-									<button type="button" class="option-button" onclick="selectOption(this, 'section1', 'Necesita Mejorar')">Necesita Mejorar</button>
-									<button type="button" class="info-button" onclick="openModal('modalMejorar')">?</button>
-								</div>
-								<!-- Modal para la opción "Sobresaliente" -->
-								<div id="modalMejorar" class="modal">
-									<div class="modal-content">
-										<span class="close" onclick="closeModal('modalMejorar')">&times;</span>
-										<p>El colaborador presenta algunas deficiencias en la vivencia del principio y sus valores. Si bien cumple con algunas expectativas, necesita mejorar en áreas clave para alinearse con la cultura organizacional.</p>
-									</div>
-								</div>
-								<div class="option-container">
-									<button type="button" class="option-button" onclick="selectOption(this, 'section1', 'Insuficiente')">Insuficiente</button>
-									<button type="button" class="info-button" onclick="openModal('modalInsuficiente')">?</button>
-								</div>
-								<!-- Modal para la opción "Sobresaliente" -->
-								<div id="modalInsuficiente" class="modal">
-									<div class="modal-content">
-										<span class="close" onclick="closeModal('modalInsuficiente')">&times;</span>
-										<p>El colaborador no cumple con las expectativas. Se observan acciones que no reflejan adecuadamente el principio y sus valores, y es necesario un esfuerzo significativo para mejorar su desempeño.</p>
-									</div>
-								</div>
-                            </div>
-                            <input type="hidden" name="pregunta1" id="section1-input" required>
-                            <div class="sm:flex justify-center gap-4 mt-8">
-                                <button type="button" class="next-button" onclick="nextSection(1)">Siguiente</button>
-                            </div>
-                    </div>
+.ev-wrap {
+    min-height: 100vh;
+    background: var(--ev-bg);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 68px 16px 56px;
+}
 
-                    <div class="section" id="section2" style="text-align: center;">
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Liderazgo e Integridad en la Acción</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿El evaluado actúa con integridad al ser confiable, honesto y ético, liderando con el ejemplo para fomentar un ambiente de respeto y confianza?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section2', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente2')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente2" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente2')">&times;</span>
-									<p>El colaborador supera las expectativas, demuestra un compromiso excepcional con este principio y sus valores, y actúa de manera proactiva, inspirando a otros con su actitud y resultados.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section2', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde2')">?</button>
-							</div>
-							<!-- Modal para la opción "Acorde" -->
-							<div id="modalAcorde2" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde2')">&times;</span>
-									<p>El colaborador cumple consistentemente con las expectativas, refleja un alineamiento sólido con el principio y sus valores, y ocasionalmente toma la iniciativa para mejorar y aportar soluciones innovadoras.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section2', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable2')">?</button>
-							</div>
-							<!-- Modal para la opción "Aceptable" -->
-							<div id="modalAceptable2" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable2')">&times;</span>
-									<p>El colaborador cumple con las expectativas básicas. Aunque actúa acorde al principio y sus valores, hay áreas donde podría ser más proactivo o comprometido.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section2', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar2')">?</button>
-							</div>
-							<!-- Modal para la opción "Mejorar" -->
-							<div id="modalMejorar2" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar2')">&times;</span>
-									<p>El colaborador presenta algunas deficiencias en la vivencia del principio y sus valores. Si bien cumple con algunas expectativas, necesita mejorar en áreas clave para alinearse con la cultura organizacional.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section2', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente2')">?</button>
-							</div>
-							<!-- Modal para la opción "Insuficiente" -->
-							<div id="modalInsuficiente2" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente2')">&times;</span>
-									<p>El colaborador no cumple con las expectativas. Se observan acciones que no reflejan adecuadamente el principio y sus valores, y es necesario un esfuerzo significativo para mejorar su desempeño.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta2" id="section2-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(2)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(2)">Siguiente</button>
-                        </div>
-                    </div>
+.ev-card {
+    background: var(--ev-card);
+    border-radius: var(--ev-radius);
+    box-shadow: 0 4px 24px rgba(0,94,184,.08);
+    width: 100%;
+    max-width: 700px;
+    padding: 40px 40px 32px;
+    position: relative;
+}
 
-                    <div class="section" id="section3" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Competitividad, Innovación y Adaptabilidad</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿El evaluado muestra iniciativa para proponer mejoras, adaptarse rápidamente a los cambios y ofrecer soluciones innovadoras que impulsen la excelencia?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section3', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente3')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente3" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente3')">&times;</span>
-									<p>El colaborador supera las expectativas, demuestra un compromiso excepcional con este principio y sus valores, y actúa de manera proactiva, inspirando a otros con su actitud y resultados.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section3', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde3')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde3" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde3')">&times;</span>
-									<p>El colaborador cumple consistentemente con las expectativas, refleja un alineamiento sólido con el principio y sus valores, y ocasionalmente toma la iniciativa para mejorar y aportar soluciones innovadoras.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section3', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable3')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable3" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable3')">&times;</span>
-									<p>El colaborador cumple con las expectativas básicas. Aunque actúa acorde al principio y sus valores, hay áreas donde podría ser más proactivo o comprometido.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section3', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar3')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar3" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar3')">&times;</span>
-									<p>El colaborador presenta algunas deficiencias en la vivencia del principio y sus valores. Si bien cumple con algunas expectativas, necesita mejorar en áreas clave para alinearse con la cultura organizacional.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section3', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente3')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente3" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente3')">&times;</span>
-									<p>El colaborador no cumple con las expectativas. Se observan acciones que no reflejan adecuadamente el principio y sus valores, y es necesario un esfuerzo significativo para mejorar su desempeño.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta3" id="section3-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(3)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(3)">Siguiente</button>
-                        </div>
-                    </div>
+@media (max-width: 600px) {
+    .ev-card { padding: 24px 18px 20px; }
+}
 
-                    <div class="section" id="section4" style="text-align: center;">
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Comunicación Asertiva y Sentido de Pertenencia</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿El evaluado fomenta una comunicación abierta y efectiva, participa activamente en las iniciativas institucionales y contribuye con sentido de pertenencia al propósito y cuidado de la institución?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section4', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente4')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente4" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente4')">&times;</span>
-									<p>El colaborador supera las expectativas, demuestra un compromiso excepcional con este principio y sus valores, y actúa de manera proactiva, inspirando a otros con su actitud y resultados.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section4', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde4')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde4" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde4')">&times;</span>
-									<p>El colaborador cumple consistentemente con las expectativas, refleja un alineamiento sólido con el principio y sus valores, y ocasionalmente toma la iniciativa para mejorar y aportar soluciones innovadoras.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section4', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable4')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable4" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable4')">&times;</span>
-									<p>El colaborador cumple con las expectativas básicas. Aunque actúa acorde al principio y sus valores, hay áreas donde podría ser más proactivo o comprometido.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section4', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar4')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar4" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar4')">&times;</span>
-									<p>El colaborador presenta algunas deficiencias en la vivencia del principio y sus valores. Si bien cumple con algunas expectativas, necesita mejorar en áreas clave para alinearse con la cultura organizacional.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section4', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente4')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente4" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente4')">&times;</span>
-									<p>El colaborador no cumple con las expectativas. Se observan acciones que no reflejan adecuadamente el principio y sus valores, y es necesario un esfuerzo significativo para mejorar su desempeño.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta4" id="section4-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(4)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(4)">Siguiente</button>
-                        </div>
-                    </div>
+/* Progress bar */
+.ev-progress-wrap {
+    background: #e2e8f0;
+    border-radius: 99px;
+    height: 6px;
+    margin-bottom: 28px;
+    overflow: hidden;
+}
+.ev-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #005EB8, #0074E0);
+    border-radius: 99px;
+    transition: width .4s ease;
+    width: 0%;
+}
 
-                    <div class="section" id="section5" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Compromiso con la calidad</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿De qué manera el evaluado ha contribuido al cumplimiento de los estándares institucionales (políticas, planes, reglamentos y procedimientos), comunicando oportunamente incidentes o no conformidades y asegurando que su trabajo impacte positivamente en la experiencia de nuestros pacientes?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section5', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente5')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente5" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente5')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section5', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde5')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde5" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde5')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section5', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable5')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable5" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable5')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section5', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar5')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar5" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar5')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section5', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente5')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente5" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente5')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta5" id="section5-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(5)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(5)">Siguiente</button>
-                        </div>
-                    </div>
+/* Step indicator */
+.ev-step {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--ev-accent);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 8px;
+}
 
-                    <div class="section" id="section6" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Compromiso institucional y cumplimiento de normas internas</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿De qué manera el evaluado se convierte en un modelo de respeto y pertenencia, inspirando con su puntualidad, cuidado de la imagen profesional y compromiso con las normas, mientras cultiva un entorno de armonía y excelencia?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section6', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente6')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente6" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente6')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section6', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde6')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde6" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde6')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section6', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable6')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable6" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable6')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section6', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar6')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar6" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar6')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section6', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente6')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente6" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente6')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta6" id="section6-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(6)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(6)">Siguiente</button>
-                        </div>
-                    </div>
+/* Section */
+.ev-section { display: none; }
+.ev-section.active { display: block; }
+/* ── Modal informativo de sección ────────────────────────────────── */
+@keyframes evModalIn {
+    from { opacity:0; transform:translateY(16px) scale(.97); }
+    to   { opacity:1; transform:translateY(0)    scale(1);   }
+}
+/* ── Banner colapsable ───────────────────────────────────────────── */
+.ev-banner {
+    border:1.5px solid #bfdbfe;
+    border-radius:12px;
+    background:#eff6ff;
+    margin-bottom:20px;
+    overflow:hidden;
+}
+.ev-banner-header {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 14px;
+    cursor:pointer;
+    user-select:none;
+}
+.ev-banner-header:hover { background:#dbeafe; }
+.ev-banner-icon  { font-size:1.1rem; }
+.ev-banner-title { font-size:.82rem; font-weight:700; color:#1e40af; flex:1; }
+.ev-banner-arrow { font-size:.75rem; color:#3b82f6; transition:transform .3s; }
+.ev-banner.open .ev-banner-arrow { transform:rotate(180deg); }
+.ev-banner-body  { 
+    font-size:.8rem; color:#1e40af; line-height:1.6;
+    padding:0 14px; max-height:0; overflow:hidden;
+    transition:max-height .3s ease, padding .3s ease;
+}
+.ev-banner.open .ev-banner-body { max-height:200px; padding:0 14px 12px; }
 
-                    <div class="section" id="section7" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Participación y formación continua</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿En qué grado el colaborador demuestra su pasión por aprender y enseñar, integrando conocimientos adquiridos en cada interacción y potenciando la cooperación en su equipo para crear soluciones que trasciendan en nuestra misión de humanización y calidad?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section7', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente7')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente7" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente7')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section7', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde7')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde7" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde7')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section7', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable7')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable7" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable7')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section7', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar7')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar7" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar7')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section7', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente7')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente7" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente7')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta7" id="section7-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(7)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(7)">Siguiente</button>
-                        </div>
-                    </div>
 
-                    <div class="section" id="section8" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Gestión de Seguridad y Salud en el Trabajo (SST)</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿Cómo evalúas el rol del colaborador en la promoción de un entorno seguro, cumpliendo con las normas de bioseguridad, participando en programas preventivos y actuando de manera efectiva frente a situaciones de riesgo o emergencia?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section8', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente8')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente8" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente8')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section8', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde8')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde8" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde8')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section8', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable8')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable8" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable8')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section8', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar8')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar8" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar8')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section8', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente8')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente8" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente8')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta8" id="section8-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(8)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(8)">Siguiente</button>
-                        </div>
-                    </div>
+/* Title */
+.ev-title {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--ev-text);
+    margin-bottom: 12px;
+    line-height: 1.3;
+}
 
-                    <div class="section" id="section9" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Gestión de Relaciones Interpersonales</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">En su día a día, el colaborador demuestra la capacidad de construir puentes de confianza y comunicación que fortalecen las relaciones con compañeros, líderes y otras partes interesadas. ¿Cómo calificarías su habilidad para resolver conflictos de forma creativa y generar un entorno laboral armónico que impulse la cultura organizacional?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section9', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente9')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente9" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente9')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section9', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde9')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde9" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde9')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section9', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable9')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable9" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable9')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section9', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar9')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar9" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar9')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section9', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente9')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente9" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente9')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta9" id="section9-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(9)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(9)">Siguiente</button>
-                        </div>
-                    </div>
+/* Question */
+.ev-question {
+    font-size: .9rem;
+    color: var(--ev-muted);
+    line-height: 1.6;
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 24px;
+    border-left: 3px solid var(--ev-accent);
+}
 
-                    <div class="section" id="section10" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Eficacia en la Ejecución de Responsabilidades y Contribución a los Resultados</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">¿De qué manera el colaborador traduce sus responsabilidades en acciones que generan resultados tangibles, demostrando puntualidad, precisión y un impacto significativo en el cumplimiento de las metas organizacionales?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section10', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente10')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente10" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente10')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section10', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde10')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde10" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde10')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section10', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable10')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable10" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable10')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section10', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar10')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar10" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar10')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section10', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente10')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente10" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente10')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta10" id="section10-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(10)">Anterior</button>
-                            <button type="button" class="next-button" onclick="nextSection(10)">Siguiente</button>
-                        </div>
-                    </div>
+/* Option buttons */
+.ev-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
 
-                    <div class="section" id="section11" style="text-align: center;"> 
-                        <h1 class="md:text-40 text-32 font-bold text-link dark:text-white leading-tight text-center" style="color: #0058af;">Gestión Eficiente del Tiempo y los Recursos</h1>
-                        <p class="mt-5 text-center w-fit mx-auto py-1 px-2 rounded-md border-2 border-dashed border-border dark:border-darkborder text-sm font-medium justify-center text-lightmuted dark:text-darklink flex items-center flex-wrap gap-1">En su rol, el colaborador organiza su tiempo y recursos con una visión estratégica, priorizando tareas clave y minimizando el desperdicio. ¿Cómo evaluarías su capacidad para cumplir plazos establecidos, optimizar recursos disponibles y entregar resultados alineados con las demandas del cargo?</p>
-                        <div class="options mt-5">
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section11', 'Sobresaliente')">Sobresaliente</button>
-								<button type="button" class="info-button" onclick="openModal('modalSobresaliente11')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalSobresaliente11" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalSobresaliente11')">&times;</span>
-									<p>El colaborador excede consistentemente las expectativas en este criterio, demostrando un compromiso excepcional, creatividad y resultados que trascienden los estándares establecidos. Su desempeño genera impacto positivo y es un referente de excelencia para sus compañeros y el equipo.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section11', 'Acorde')">Acorde</button>
-								<button type="button" class="info-button" onclick="openModal('modalAcorde11')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAcorde11" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAcorde11')">&times;</span>
-									<p>El colaborador cumple con las expectativas y estándares definidos, manteniendo un desempeño consistente y adecuado en sus responsabilidades. Contribuye de manera efectiva al logro de los objetivos organizacionales.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section11', 'Aceptable')">Aceptable</button>
-								<button type="button" class="info-button" onclick="openModal('modalAceptable11')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalAceptable11" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalAceptable11')">&times;</span>
-									<p>El colaborador cumple con los aspectos básicos del criterio, pero su desempeño podría beneficiarse de un mayor enfoque, compromiso o consistencia para alcanzar su máximo potencial.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section11', 'Necesita Mejorar')">Necesita Mejorar</button>
-								<button type="button" class="info-button" onclick="openModal('modalMejorar11')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalMejorar11" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalMejorar11')">&times;</span>
-									<p>El desempeño del colaborador está por debajo de lo esperado, lo que afecta la calidad de los resultados o el cumplimiento de sus responsabilidades. Se requiere un plan de acción para abordar las áreas de mejora.</p>
-								</div>
-							</div>
-							<div class="option-container">
-								<button type="button" class="option-button" onclick="selectOption(this, 'section11', 'Insuficiente')">Insuficiente</button>
-								<button type="button" class="info-button" onclick="openModal('modalInsuficiente11')">?</button>
-							</div>
-							<!-- Modal para la opción "Sobresaliente" -->
-							<div id="modalInsuficiente11" class="modal">
-								<div class="modal-content">
-									<span class="close" onclick="closeModal('modalInsuficiente11')">&times;</span>
-									<p>El desempeño del colaborador es significativamente inferior a los estándares esperados, con un impacto negativo en el equipo o los resultados organizacionales. Se requiere intervención inmediata para corregir la situación.</p>
-								</div>
-							</div>
-                        </div>
-                        <input type="hidden" name="pregunta11" id="section11-input" required>
-                        <div class="sm:flex justify-center gap-4 mt-8">
-                            <button type="button" class="back-button" onclick="previousSection(11)">Anterior</button>
-                            <button type="submit" class="next-button">Guardar y enviar</button>
-                        </div>
-                    </div>
+.ev-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border: 2px solid var(--ev-border);
+    border-radius: 12px;
+    cursor: pointer;
+    background: #fff;
+    transition: all .2s;
+    text-align: left;
+    font-family: inherit;
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--ev-text);
+    width: 100%;
+}
 
-                </form>
+.ev-option:hover {
+    border-color: var(--ev-accent);
+    background: #f0f7ff;
+    color: #1e293b;
+}
+
+.ev-option.selected {
+    border-color: var(--ev-accent);
+    background: #e8f0fb;
+    color: var(--ev-accent);
+}
+
+.ev-option-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--ev-border);
+    flex-shrink: 0;
+    transition: all .2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ev-option.selected .ev-option-dot {
+    border-color: var(--ev-accent);
+    background: var(--ev-accent);
+}
+
+.ev-option.selected .ev-option-dot::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    display: block;
+}
+
+/* Calificación badge colors */
+.ev-opt-sobresaliente { --c: #065f46; --bg: #d1fae5; --bd: #6ee7b7; }
+.ev-opt-acorde        { --c: #1e40af; --bg: #dbeafe; --bd: #93c5fd; }
+.ev-opt-aceptable     { --c: #713f12; --bg: #fef9c3; --bd: #fde047; }
+.ev-opt-necesita      { --c: #92400e; --bg: #fef3c7; --bd: #fcd34d; }
+.ev-opt-insuficiente  { --c: #991b1b; --bg: #fee2e2; --bd: #fca5a5; }
+
+.ev-option.ev-opt-sobresaliente.selected { border-color: #6ee7b7; background: #d1fae5; color: #065f46; }
+.ev-option.ev-opt-acorde.selected        { border-color: #93c5fd; background: #dbeafe; color: #1e40af; }
+.ev-option.ev-opt-aceptable.selected     { border-color: #fde047; background: #fef9c3; color: #713f12; }
+.ev-option.ev-opt-necesita.selected      { border-color: #fcd34d; background: #fef3c7; color: #92400e; }
+.ev-option.ev-opt-insuficiente.selected  { border-color: #fca5a5; background: #fee2e2; color: #991b1b; }
+
+/* ── Tooltip nube ─────────────────────────────────────────── */
+.ev-option { position: relative; }
+
+.ev-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(320px, 90vw);
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: .76rem;
+    font-weight: 400;
+    color: #475569;
+    line-height: 1.5;
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s ease, transform .2s ease;
+    transform: translateX(-50%) translateY(4px);
+    z-index: 999;
+    text-align: left;
+}
+
+.ev-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #fff;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,.08));
+}
+
+.ev-tooltip::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: #e2e8f0;
+    margin-top: 1px;
+}
+
+.ev-option:hover .ev-tooltip,
+.ev-option:focus .ev-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Justification box */
+.ev-justif {
+    display: none;
+    margin-top: 14px;
+    background: #fffbeb;
+    border: 1.5px solid #f59e0b;
+    border-radius: 10px;
+    padding: 14px 16px;
+}
+
+.ev-justif label {
+    font-size: .82rem;
+    font-weight: 700;
+    color: #92400e;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.ev-justif textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #f59e0b;
+    border-radius: 8px;
+    font-size: .84rem;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    background: #fff;
+    min-height: 72px;
+    color: #1e293b;
+}
+
+/* Navigation buttons */
+.ev-nav {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.ev-btn {
+    padding: 11px 24px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: .88rem;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+    transition: all .2s;
+}
+
+.ev-btn-primary {
+    background: var(--ev-accent);
+    color: #fff;
+    flex: 1;
+}
+.ev-btn-primary:hover { background: var(--ev-accent2); }
+
+.ev-btn-back {
+    background: #f1f5f9;
+    color: var(--ev-muted);
+    min-width: 100px;
+}
+.ev-btn-back:hover { background: #e2e8f0; }
+
+.ev-btn-submit {
+    background: #059669;
+    color: #fff;
+    flex: 1;
+}
+.ev-btn-submit:hover { background: #047857; }
+
+/* Confirm section */
+.ev-confirm-icon {
+    text-align: center;
+    font-size: 3rem;
+    margin-bottom: 12px;
+}
+.ev-confirm-title {
+    font-size: 1.3rem;
+    font-weight: 800;
+    text-align: center;
+    color: var(--ev-text);
+    margin-bottom: 8px;
+}
+.ev-confirm-sub {
+    text-align: center;
+    color: var(--ev-muted);
+    font-size: .88rem;
+    margin-bottom: 24px;
+}
+</style>
+
+
+<!-- Modal informativo de sección -->
+<div id="evSectionModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);
+     z-index:9999;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:20px;padding:32px 28px;width:min(520px,95vw);
+                box-shadow:0 24px 64px rgba(0,0,0,.2);animation:evModalIn .3s ease;">
+        <div id="evSectionModalIcon"  style="font-size:2.2rem;margin-bottom:12px;text-align:center;"></div>
+        <div id="evSectionModalTitle" style="font-size:1rem;font-weight:800;color:#1e3a5f;margin-bottom:10px;text-align:center;"></div>
+        <div id="evSectionModalText"  style="font-size:.84rem;color:#475569;line-height:1.7;text-align:center;margin-bottom:24px;"></div>
+        <div style="text-align:center;">
+            <button onclick="cerrarSectionModal()"
+                    style="padding:10px 32px;background:#0058af;color:#fff;border:none;
+                           border-radius:10px;font-size:.88rem;font-weight:700;cursor:pointer;">
+                Continuar →
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal bienvenida -->
+<div id="evBienvenidaModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.7);
+     z-index:10000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:20px;padding:36px 32px;width:min(560px,95vw);
+                box-shadow:0 24px 64px rgba(0,0,0,.25);animation:evModalIn .3s ease;text-align:center;">
+        <div style="font-size:2.4rem;margin-bottom:14px;"><i class="ti ti-building-hospital" style="color:#0058af;"></i></div>
+        <div style="font-size:1.05rem;font-weight:800;color:#1e3a5f;margin-bottom:14px;">
+            Evaluación del Desempeño V2 2026
+        </div>
+        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:28px;text-align:left;
+                    background:#f8fafc;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;">
+            En la Clínica Zayma, creemos que cada acción cuenta y cada colaborador es pieza clave en nuestra misión de servir con excelencia y calidez humana, para trascender en la vida de las personas. Este formulario es una oportunidad para evaluar el desempeño de tu colaborador con sinceridad y objetividad, destacando sus fortalezas y trazando juntos el camino hacia la excelencia.
+        </div>
+        <button onclick="cerrarBienvenidaModal()"
+                style="padding:12px 36px;background:#0058af;color:#fff;border:none;
+                       border-radius:12px;font-size:.9rem;font-weight:700;cursor:pointer;
+                       box-shadow:0 4px 14px rgba(0,88,175,.3);">
+            Comenzar evaluación →
+        </button>
+    </div>
+</div>
+
+
+<div class="ev-wrap">
+    <div class="ev-card">
+
+        <!-- Header -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;
+                    padding-bottom:20px;border-bottom:1.5px solid var(--ev-border);">
+            <div style="width:44px;height:44px;border-radius:12px;background:#e8f0fb;
+                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="22" height="22" fill="#005EB8" viewBox="0 0 24 24">
+                    <path d="M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:1rem;font-weight:800;color:var(--ev-text);">Evaluación de Colaborador</div>
+                <div style="font-size:.8rem;color:var(--ev-muted);">Clínica Zayma · Evaluación de Desempeño</div>
             </div>
         </div>
-</main>
+
+        <!-- Progress -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="ev-step" id="ev-step">Pregunta 1 de 11</span>
+            <span style="font-size:.78rem;color:var(--ev-muted);" id="ev-pct">0%</span>
+        </div>
+        <div class="ev-progress-wrap">
+            <div class="ev-progress-bar" id="ev-progress"></div>
+        </div>
+
+        <!-- Form -->
+        <form id="evaluationForm" class="FormularioAjax"
+              action="<?php echo APP_URL; ?>app/ajax/formulariosAjax.php" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="modulo_evaluacion" value="registrarEvaluacionColaborador">
+                    <?php
+            $idempleado = $_POST['empleadoevaluado'] 
+                        ?? $_SESSION['idempleado_evaluar'] 
+                        ?? '';
+            if (!empty($idempleado)) {
+                $_SESSION['idempleado_evaluar'] = $idempleado;
+            }
+        ?>
+        <input type="hidden" name="empleadoevaluado" value="<?php echo htmlspecialchars($idempleado); ?>">
+
+        <div class="ev-section active" id="ev-section-1">
+            <!-- Banner colapsable sección 1 -->
+            <div class="ev-banner" id="ev-banner-1">
+                <div class="ev-banner-header" onclick="toggleBanner(1)">
+                    <span class="ev-banner-icon"><i class="ti ti-sparkles"></i></span>
+                    <span class="ev-banner-title">Dimensión 1: Viviendo Nuestros Valores</span>
+                    <span class="ev-banner-arrow">▼</span>
+                </div>
+                <div class="ev-banner-body">En este espacio, reflexionaremos sobre cómo nuestros principios y valores se transforman en acciones diarias que nos definen como equipo y como institución. La calidez humana, la innovación, la integridad y los demás principios y valores no son solo palabras, son el motor que impulsa cada decisión y cada interacción.</div>
+            </div>
+            <div class="ev-step" id="ev-step">Pregunta 1 de 11</div>
+            <h2 class="ev-title">Calidez Humana y Servicio con Propósito</h2>
+            <div class="ev-question">¿El evaluado refleja cercanía y disposición en su atención, ofreciendo un servicio humanizado que priorice las necesidades y el bienestar de los demás con un compromiso genuino?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 1, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[1][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[1][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 1, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[1][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[1][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 1, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[1][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[1][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 1, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[1][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[1][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 1, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[1][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[1][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-1">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-1" name="justificacion1" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta1" id="ev-input-1" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(1, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-2">
+            <div class="ev-step" id="ev-step-2">Pregunta 2 de 11</div>
+            <h2 class="ev-title">Liderazgo e Integridad en la Acción</h2>
+            <div class="ev-question">¿El evaluado actúa con integridad al ser confiable, honesto y ético, liderando con el ejemplo para fomentar un ambiente de respeto y confianza?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 2, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[2][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[2][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 2, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[2][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[2][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 2, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[2][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[2][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 2, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[2][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[2][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 2, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[2][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[2][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-2">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-2" name="justificacion2" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta2" id="ev-input-2" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(2)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(2, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-3">
+            <div class="ev-step" id="ev-step-3">Pregunta 3 de 11</div>
+            <h2 class="ev-title">Competitividad, Innovación y Adaptabilidad</h2>
+            <div class="ev-question">¿El evaluado muestra iniciativa para proponer mejoras, adaptarse rápidamente a los cambios y ofrecer soluciones innovadoras que impulsen la excelencia?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 3, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[3][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[3][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 3, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[3][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[3][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 3, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[3][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[3][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 3, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[3][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[3][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 3, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[3][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[3][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-3">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-3" name="justificacion3" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta3" id="ev-input-3" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(3)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(3, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-4">
+            <div class="ev-step" id="ev-step-4">Pregunta 4 de 11</div>
+            <h2 class="ev-title">Comunicación Asertiva y Sentido de Pertenencia</h2>
+            <div class="ev-question">¿El evaluado fomenta una comunicación abierta y efectiva, participa activamente en las iniciativas institucionales y contribuye con sentido de pertenencia al propósito y cuidado de la institución?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 4, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[4][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[4][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 4, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[4][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[4][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 4, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[4][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[4][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 4, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[4][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[4][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 4, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[4][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[4][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-4">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-4" name="justificacion4" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta4" id="ev-input-4" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(4)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(4, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-5">
+            <!-- Banner colapsable sección 5 -->
+            <div class="ev-banner" id="ev-banner-5">
+                <div class="ev-banner-header" onclick="toggleBanner(5)">
+                    <span class="ev-banner-icon"><i class="ti ti-settings"></i></span>
+                    <span class="ev-banner-title">Funciones Generales</span>
+                    <span class="ev-banner-arrow">▼</span>
+                </div>
+                <div class="ev-banner-body">En esta sesión evaluaremos aquellos aspectos fundamentales que sustentan el éxito colectivo: el compromiso con la calidad, la adherencia a las normas internas, la participación activa en el desarrollo profesional y el cuidado por la seguridad y salud en el trabajo.</div>
+            </div>
+            <div class="ev-step" id="ev-step-5">Pregunta 5 de 11</div>
+            <h2 class="ev-title">Compromiso con la calidad</h2>
+            <div class="ev-question">¿De qué manera el evaluado ha contribuido al cumplimiento de los estándares institucionales (políticas, planes, reglamentos y procedimientos), comunicando oportunamente incidentes o no conformidades y asegurando que su trabajo impacte positivamente en la experiencia de nuestros pacientes?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 5, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[5][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[5][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 5, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[5][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[5][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 5, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[5][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[5][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 5, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[5][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[5][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 5, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[5][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[5][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-5">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-5" name="justificacion5" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta5" id="ev-input-5" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(5)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(5, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-6">
+            <div class="ev-step" id="ev-step-6">Pregunta 6 de 11</div>
+            <h2 class="ev-title">Compromiso institucional y cumplimiento de normas internas</h2>
+            <div class="ev-question">¿De qué manera el evaluado se convierte en un modelo de respeto y pertenencia, inspirando con su puntualidad, cuidado de la imagen profesional y compromiso con las normas, mientras cultiva un entorno de armonía y excelencia?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 6, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[6][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[6][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 6, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[6][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[6][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 6, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[6][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[6][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 6, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[6][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[6][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 6, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[6][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[6][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-6">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-6" name="justificacion6" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta6" id="ev-input-6" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(6)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(6, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-7">
+            <div class="ev-step" id="ev-step-7">Pregunta 7 de 11</div>
+            <h2 class="ev-title">Participación y formación continua</h2>
+            <div class="ev-question">¿En qué grado el colaborador demuestra su pasión por aprender y enseñar, integrando conocimientos adquiridos en cada interacción y potenciando la cooperación en su equipo para crear soluciones que trasciendan en nuestra misión de humanización y calidad?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 7, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[7][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[7][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 7, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[7][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[7][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 7, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[7][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[7][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 7, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[7][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[7][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 7, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[7][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[7][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-7">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-7" name="justificacion7" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta7" id="ev-input-7" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(7)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(7, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-8">
+            <div class="ev-step" id="ev-step-8">Pregunta 8 de 11</div>
+            <h2 class="ev-title">Gestión de Seguridad y Salud en el Trabajo (SST)</h2>
+            <div class="ev-question">¿Cómo evalúas el rol del colaborador en la promoción de un entorno seguro, cumpliendo con las normas de bioseguridad, participando en programas preventivos y actuando de manera efectiva frente a situaciones de riesgo o emergencia?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 8, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[8][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[8][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 8, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[8][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[8][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 8, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[8][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[8][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 8, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[8][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[8][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 8, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[8][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[8][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-8">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-8" name="justificacion8" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta8" id="ev-input-8" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(8)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(8, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-9">
+            <!-- Banner colapsable sección 9 -->
+            <div class="ev-banner" id="ev-banner-9">
+                <div class="ev-banner-header" onclick="toggleBanner(9)">
+                    <span class="ev-banner-icon"><i class="ti ti-rocket"></i></span>
+                    <span class="ev-banner-title">Potenciando el Impacto en Funciones Específicas</span>
+                    <span class="ev-banner-arrow">▼</span>
+                </div>
+                <div class="ev-banner-body">En esta sección, queremos ir más allá del simple cumplimiento de tareas: buscamos descubrir cómo el talento del colaborador transforma la rutina en resultados extraordinarios. Evaluaremos cómo su desempeño impulsa un entorno de colaboración positiva y cómo aprovecha al máximo el tiempo y los recursos.</div>
+            </div>
+            <div class="ev-step" id="ev-step-9">Pregunta 9 de 11</div>
+            <h2 class="ev-title">Gestión de Relaciones Interpersonales</h2>
+            <div class="ev-question">En su día a día, el colaborador demuestra la capacidad de construir puentes de confianza y comunicación que fortalecen las relaciones con compañeros, líderes y otras partes interesadas. ¿Cómo calificarías su habilidad para resolver conflictos de forma creativa y generar un entorno laboral armónico que impulse la cultura organizacional?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 9, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[9][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[9][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 9, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[9][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[9][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 9, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[9][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[9][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 9, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[9][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[9][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 9, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[9][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[9][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-9">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-9" name="justificacion9" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta9" id="ev-input-9" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(9)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(9, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-10">
+            <div class="ev-step" id="ev-step-10">Pregunta 10 de 11</div>
+            <h2 class="ev-title">Eficacia en la Ejecución de Responsabilidades y Contribución a los Resultados</h2>
+            <div class="ev-question">¿De qué manera el colaborador traduce sus responsabilidades en acciones que generan resultados tangibles, demostrando puntualidad, precisión y un impacto significativo en el cumplimiento de las metas organizacionales?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 10, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[10][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[10][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 10, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[10][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[10][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 10, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[10][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[10][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 10, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[10][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[10][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 10, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[10][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[10][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-10">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-10" name="justificacion10" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta10" id="ev-input-10" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(10)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(10, 11)">Siguiente →</button></div>
+        </div>
+        <div class="ev-section" id="ev-section-11">
+            <div class="ev-step" id="ev-step-11">Pregunta 11 de 11</div>
+            <h2 class="ev-title">Gestión Eficiente del Tiempo y los Recursos</h2>
+            <div class="ev-question">En su rol, el colaborador organiza su tiempo y recursos con una visión estratégica, priorizando tareas clave y minimizando el desperdicio. ¿Cómo evaluarías su capacidad para cumplir plazos establecidos, optimizar recursos disponibles y entregar resultados alineados con las demandas del cargo?</div>
+            <div class="ev-options">
+                <button type="button" class="ev-option ev-opt-sobresaliente"
+                        onclick="evSelectOption(this, 11, 'Sobresaliente')">
+                    <span class="ev-option-dot"></span>
+                    <span><i class="ti ti-star-filled" style="font-size:13px;"></i> Sobresaliente</span>
+                
+                    <?php if (!empty($tooltipDesc[11][5])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[11][5]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-acorde"
+                        onclick="evSelectOption(this, 11, 'Acorde')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('check-circle', 13) ?> Acorde</span>
+                
+                    <?php if (!empty($tooltipDesc[11][4])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[11][4]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-aceptable"
+                        onclick="evSelectOption(this, 11, 'Aceptable')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('thumbs-up', 13) ?> Aceptable</span>
+                
+                    <?php if (!empty($tooltipDesc[11][3])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[11][3]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-necesita"
+                        onclick="evSelectOption(this, 11, 'Requiere mejora')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('alert-circle', 13) ?> Requiere mejora</span>
+                
+                    <?php if (!empty($tooltipDesc[11][2])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[11][2]) ?></span><?php endif; ?>
+                </button>
+                <button type="button" class="ev-option ev-opt-insuficiente"
+                        onclick="evSelectOption(this, 11, 'Insuficiente')">
+                    <span class="ev-option-dot"></span>
+                    <span><?= icon('x-circle', 13) ?> Insuficiente</span>
+                
+                    <?php if (!empty($tooltipDesc[11][1])): ?><span class="ev-tooltip"><?= htmlspecialchars($tooltipDesc[11][1]) ?></span><?php endif; ?>
+                </button>
+            </div>
+            <div class="ev-justif" id="ev-justif-11">
+                <label><?= icon('alert-circle', 13) ?> Calificación extrema — justificación obligatoria</label>
+                <textarea id="ev-jtext-11" name="justificacion11" maxlength="500"
+                          placeholder="Explica brevemente el motivo de esta calificación..."></textarea>
+            </div>
+            <input type="hidden" name="pregunta11" id="ev-input-11" required>
+            <div class="ev-nav"><button type="button" class="ev-btn ev-btn-back" onclick="evPrev(11)">← Anterior</button><button type="button" class="ev-btn ev-btn-primary" onclick="evNext(11, 11)">Siguiente →</button></div>
+        </div>
+
+        <div class="ev-section" id="ev-section-confirm">
+            <!-- <div class="ev-confirm-icon">🎯</div> -->
+            <div class="ev-confirm-title">¿Deseas enviar la evaluación?</div>
+            <div class="ev-confirm-sub">
+                Has completado las 11 preguntas.<br>
+                Revisa tu evaluación antes de enviarla — una vez enviada no podrá modificarse.
+            </div>
+            <div class="ev-nav">
+                <button type="button" class="ev-btn ev-btn-back" onclick="evPrevFromConfirm(11)">← Revisar</button>
+                <button type="submit" class="ev-btn ev-btn-submit"><?= icon('check-circle', 14) ?> Enviar evaluación</button>
+            </div>
+        </div>
+        </form>
+    </div>
+</div>
+
 
 <script>
-	function selectOption(button, section, value) {
-		// Deseleccionar todos los botones en la sección completa
-		var sectionButtons = document.querySelectorAll(`#${section} .option-button`);
-		sectionButtons.forEach(btn => btn.classList.remove('selected'));
+    function evSelectOption(btn, sectionNum, value) {
+        // Deselect all options in section
+        document.querySelectorAll('#ev-section-' + sectionNum + ' .ev-option').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('ev-input-' + sectionNum).value = value;
 
-		// Seleccionar el botón actual
-		button.classList.add('selected');
-
-		// Establecer el valor del input oculto
-		document.getElementById(section + '-input').value = value;
-	}
-
-    function nextSection(currentSection) {
-        var currentInput = document.getElementById('section' + currentSection + '-input');
-        if (currentInput.value === '') {
-/*             alert('Por favor, selecciona una opción.');
-            return; */
-            Swal.fire({
-                icon: 'error',
-                title: 'Dato Requerido',
-                text: 'Por favor, selecciona una opción',
-                showConfirmButton: false,
-                timer: 2000
-            });
-            exit();
+        // Justification logic
+        var justifBox  = document.getElementById('ev-justif-' + sectionNum);
+        var justifText = document.getElementById('ev-jtext-' + sectionNum);
+        if (justifBox) {
+            if (value === 'Sobresaliente' || value === 'Insuficiente') {
+                justifBox.style.display = 'block';
+                justifText.setAttribute('required', 'required');
+                setTimeout(() => justifText.focus(), 100);
+            } else {
+                justifBox.style.display = 'none';
+                if (justifText) { justifText.removeAttribute('required'); justifText.value = ''; }
+            }
         }
-        document.getElementById('section' + currentSection).classList.remove('active');
-        document.getElementById('section' + (currentSection + 1)).classList.add('active');
-        updateProgressBar(currentSection + 1);
     }
 
-    function updateProgressBar(section) {
-        var progressBar = document.getElementById('progress-bar');
-        var totalSections = document.getElementsByClassName('section').length;
-        var progress = (section / totalSections) * 100;
-        progressBar.style.width = progress + '%';
+    function evNext(current, total) {
+        var inp = document.getElementById('ev-input-' + current);
+        if (!inp || inp.value === '') {
+            Swal.fire({ icon:'error', title:'Dato requerido', text:'Selecciona una opción para continuar.', timer:2000, showConfirmButton:false });
+            return;
+        }
+        if (inp.value === 'Sobresaliente' || inp.value === 'Insuficiente') {
+            var jt = document.getElementById('ev-jtext-' + current);
+            if (!jt || jt.value.trim() === '') {
+                Swal.fire({ icon:'warning', title:'Justificación requerida', text:'Debes justificar la calificación de ' + inp.value + ' antes de continuar.', confirmButtonText:'Entendido' });
+                if (jt) jt.focus();
+                return;
+            }
+        }
+        document.getElementById('ev-section-' + current).classList.remove('active');
+        var nextId = (current < total) ? 'ev-section-' + (current + 1) : 'ev-section-confirm';
+        document.getElementById(nextId).classList.add('active');
+        evUpdateProgress(current + 1, total + 1);
+        window.scrollTo({top:0, behavior:'smooth'});
+        if (current < total) mostrarSectionModal(current + 1);
     }
 
-    function previousSection(currentSection) {
-        document.getElementById('section' + currentSection).classList.remove('active');
-        document.getElementById('section' + (currentSection - 1)).classList.add('active');
-        updateProgressBar(currentSection - 1);
+    function evPrev(current) {
+        document.getElementById('ev-section-' + current).classList.remove('active');
+        document.getElementById('ev-section-' + (current - 1)).classList.add('active');
+        evUpdateProgress(current - 1, document.querySelectorAll('.ev-section').length);
+        window.scrollTo({top:0, behavior:'smooth'});
     }
-	
-	function openModal(modalId) {
-		document.getElementById(modalId).style.display = "block";
-	}
 
-	function closeModal(modalId) {
-		document.getElementById(modalId).style.display = "none";
-	}
+    function evPrevFromConfirm(total) {
+        document.getElementById('ev-section-confirm').classList.remove('active');
+        document.getElementById('ev-section-' + total).classList.add('active');
+        evUpdateProgress(total, total + 1);
+    }
 
-	window.onclick = function(event) {
-		let modals = document.querySelectorAll(".modal");
-		modals.forEach(modal => {
-			if (event.target === modal) {
-				modal.style.display = "none";
-			}
-		});
-	};
+    // ── Modales + banners por dimensión ──────────────────────────────────────
+    const evSecciones = {
+        1: { icon:'<i class="ti ti-sparkles" style="font-size:2rem;color:#0058af;"></i>', title:'Dimensión 1: Viviendo Nuestros Valores Construyendo Nuestra Identidad', text:'En este espacio, reflexionaremos sobre cómo nuestros principios y valores se transforman en acciones diarias que nos definen como equipo y como institución. La calidez humana, la innovación, la integridad y los demás principios y valores no son solo palabras, son el motor que impulsa cada decisión y cada interacción.' },
+        5: { icon:'<i class="ti ti-settings" style="font-size:2rem;color:#0058af;"></i>', title:'Funciones Generales: El Pilar de Nuestro Compromiso Institucional', text:'En esta sesión evaluaremos aquellos aspectos fundamentales que sustentan el éxito colectivo: el compromiso con la calidad, la adherencia a las normas internas, la participación activa en el desarrollo profesional y el cuidado por la seguridad y salud en el trabajo.' },
+        9: { icon:'<i class="ti ti-rocket" style="font-size:2rem;color:#0058af;"></i>', title:'Potenciando el Impacto en Funciones Específicas', text:'En esta sección, queremos ir más allá del simple cumplimiento de tareas: buscamos descubrir cómo el talento del colaborador transforma la rutina en resultados extraordinarios. Evaluaremos cómo su desempeño impulsa un entorno de colaboración positiva.' },
+    };
+
+    function mostrarSectionModal(seccion) {
+        const key  = 'evModal_sub_' + seccion;
+        if (sessionStorage.getItem(key)) return;
+        const data = evSecciones[seccion];
+        if (!data) return;
+        document.getElementById('evSectionModalIcon').innerHTML  = data.icon;
+        document.getElementById('evSectionModalTitle').textContent = data.title;
+        document.getElementById('evSectionModalText').textContent  = data.text;
+        document.getElementById('evSectionModal').style.display    = 'flex';
+        sessionStorage.setItem(key, '1');
+    }
+
+    function cerrarSectionModal() {
+        document.getElementById('evSectionModal').style.display = 'none';
+    }
+
+    function toggleBanner(sec) {
+        const banner = document.getElementById('ev-banner-' + sec);
+        if (banner) banner.classList.toggle('open');
+    }
+
+
+    // ── Modal bienvenida ─────────────────────────────────────────────────────
+    function cerrarBienvenidaModal() {
+        document.getElementById('evBienvenidaModal').style.display = 'none';
+        // Después de cerrar bienvenida mostrar modal de primera sección
+        setTimeout(function() {
+            mostrarSectionModal(1);
+        }, 300);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const key = 'evModal_sub_bienvenida';
+        if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, '1');
+            document.getElementById('evBienvenidaModal').style.display = 'flex';
+        } else {
+            mostrarSectionModal(1);
+        }
+    });
+
+
+
+
+    function evUpdateProgress(current, total) {
+        var bar = document.getElementById('ev-progress');
+        if (bar) bar.style.width = Math.round((current / total) * 100) + '%';
+        var step = document.getElementById('ev-step');
+        if (step) step.textContent = 'Pregunta ' + Math.min(current, total - 1) + ' de ' + (total - 1);
+    }
+</script>
+
+<script>
+    // Update percentage display
+    var _evOrig = evUpdateProgress;
+    evUpdateProgress = function(current, total) {
+        _evOrig(current, total);
+        var pct = document.getElementById('ev-pct');
+        if (pct) pct.textContent = Math.round((current / total) * 100) + '%';
+        var step = document.getElementById('ev-step');
+        if (step) step.textContent = 'Pregunta ' + Math.min(current, total - 1) + ' de ' + (total - 1);
+    };
+    // Initialize progress
+    evUpdateProgress(1, 11 + 1);
 </script>

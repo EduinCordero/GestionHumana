@@ -7,6 +7,16 @@ try {
 } catch (Exception $e) {
     $tooltipDesc = [];
 }
+
+// Cargar NOMBRE y PREGUNTA dinámicamente desde BD (reflejan ediciones del admin)
+$compDataSub = [];
+foreach ($compModeloTooltip->getCompetencias() as $comp) {
+    if ($comp['NUM_PREGUNTA'] >= 1 && $comp['NUM_PREGUNTA'] <= 11) {
+        $compDataSub[$comp['NUM_PREGUNTA']] = $comp;
+    }
+}
+ksort($compDataSub);
+$compDataSub = array_values($compDataSub); // índice 0-10 → NUM_PREGUNTA 1-11
 ?>
 
 <style>
@@ -381,9 +391,19 @@ try {
         <div style="font-size:1.05rem;font-weight:800;color:#1e3a5f;margin-bottom:14px;">
             Evaluación del Desempeño V2 2026
         </div>
-        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:28px;text-align:left;
+        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:16px;text-align:left;
                     background:#f8fafc;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;">
             En la Clínica Zayma, creemos que cada acción cuenta y cada colaborador es pieza clave en nuestra misión de servir con excelencia y calidez humana, para trascender en la vida de las personas. Este formulario es una oportunidad para evaluar el desempeño de tu colaborador con sinceridad y objetividad, destacando sus fortalezas y trazando juntos el camino hacia la excelencia.
+        </div>
+        <div style="font-size:.88rem;color:#1e3a5f;line-height:1.8;margin-bottom:28px;text-align:center;
+                    background:linear-gradient(135deg,#dbeafe,#eff6ff);
+                    border-radius:14px;padding:20px 22px;
+                    border:1.5px solid #93c5fd;
+                    box-shadow:0 4px 16px rgba(59,130,246,.15);">
+            <div style="font-size:1.3rem;margin-bottom:10px;">💡</div>
+            <strong style="display:block;margin-bottom:10px;font-size:.8rem;text-transform:uppercase;
+                           letter-spacing:.08em;color:#1d4ed8;">Orientación antes de comenzar</strong>
+            Evalúa los comportamientos observados durante el periodo evaluado Junio de 2025 a junio de 2026, teniendo en cuenta las responsabilidades del cargo, el contexto del servicio y las situaciones reales del día a día. Evita calificar con base en simpatías personales, hechos aislados o percepciones sin evidencia.
         </div>
         <button onclick="cerrarBienvenidaModal()"
                 style="padding:12px 36px;background:#0058af;color:#fff;border:none;
@@ -447,8 +467,8 @@ try {
                 <div class="ev-banner-body">En este espacio, reflexionaremos sobre cómo nuestros principios y valores se transforman en acciones diarias que nos definen como equipo y como institución. La calidez humana, la innovación, la integridad y los demás principios y valores no son solo palabras, son el motor que impulsa cada decisión y cada interacción.</div>
             </div>
             <div class="ev-step" id="ev-step">Pregunta 1 de 11</div>
-            <h2 class="ev-title">Calidez Humana y Servicio con Propósito</h2>
-            <div class="ev-question">¿El evaluado refleja cercanía y disposición en su atención, ofreciendo un servicio humanizado que priorice las necesidades y el bienestar de los demás con un compromiso genuino?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[0]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[0]['PREGUNTA'] ?: $compDataSub[0]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 1, 'Sobresaliente')">
@@ -496,8 +516,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-2">
             <div class="ev-step" id="ev-step-2">Pregunta 2 de 11</div>
-            <h2 class="ev-title">Liderazgo e Integridad en la Acción</h2>
-            <div class="ev-question">¿El evaluado actúa con integridad al ser confiable, honesto y ético, liderando con el ejemplo para fomentar un ambiente de respeto y confianza?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[1]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[1]['PREGUNTA'] ?: $compDataSub[1]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 2, 'Sobresaliente')">
@@ -545,8 +565,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-3">
             <div class="ev-step" id="ev-step-3">Pregunta 3 de 11</div>
-            <h2 class="ev-title">Competitividad, Innovación y Adaptabilidad</h2>
-            <div class="ev-question">¿El evaluado muestra iniciativa para proponer mejoras, adaptarse rápidamente a los cambios y ofrecer soluciones innovadoras que impulsen la excelencia?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[2]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[2]['PREGUNTA'] ?: $compDataSub[2]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 3, 'Sobresaliente')">
@@ -594,8 +614,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-4">
             <div class="ev-step" id="ev-step-4">Pregunta 4 de 11</div>
-            <h2 class="ev-title">Comunicación Asertiva y Sentido de Pertenencia</h2>
-            <div class="ev-question">¿El evaluado fomenta una comunicación abierta y efectiva, participa activamente en las iniciativas institucionales y contribuye con sentido de pertenencia al propósito y cuidado de la institución?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[3]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[3]['PREGUNTA'] ?: $compDataSub[3]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 4, 'Sobresaliente')">
@@ -652,8 +672,8 @@ try {
                 <div class="ev-banner-body">En esta sesión evaluaremos aquellos aspectos fundamentales que sustentan el éxito colectivo: el compromiso con la calidad, la adherencia a las normas internas, la participación activa en el desarrollo profesional y el cuidado por la seguridad y salud en el trabajo.</div>
             </div>
             <div class="ev-step" id="ev-step-5">Pregunta 5 de 11</div>
-            <h2 class="ev-title">Compromiso con la calidad</h2>
-            <div class="ev-question">¿De qué manera el evaluado ha contribuido al cumplimiento de los estándares institucionales (políticas, planes, reglamentos y procedimientos), comunicando oportunamente incidentes o no conformidades y asegurando que su trabajo impacte positivamente en la experiencia de nuestros pacientes?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[4]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[4]['PREGUNTA'] ?: $compDataSub[4]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 5, 'Sobresaliente')">
@@ -701,8 +721,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-6">
             <div class="ev-step" id="ev-step-6">Pregunta 6 de 11</div>
-            <h2 class="ev-title">Compromiso institucional y cumplimiento de normas internas</h2>
-            <div class="ev-question">¿De qué manera el evaluado se convierte en un modelo de respeto y pertenencia, inspirando con su puntualidad, cuidado de la imagen profesional y compromiso con las normas, mientras cultiva un entorno de armonía y excelencia?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[5]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[5]['PREGUNTA'] ?: $compDataSub[5]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 6, 'Sobresaliente')">
@@ -750,8 +770,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-7">
             <div class="ev-step" id="ev-step-7">Pregunta 7 de 11</div>
-            <h2 class="ev-title">Participación y formación continua</h2>
-            <div class="ev-question">¿En qué grado el colaborador demuestra su pasión por aprender y enseñar, integrando conocimientos adquiridos en cada interacción y potenciando la cooperación en su equipo para crear soluciones que trasciendan en nuestra misión de humanización y calidad?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[6]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[6]['PREGUNTA'] ?: $compDataSub[6]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 7, 'Sobresaliente')">
@@ -799,8 +819,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-8">
             <div class="ev-step" id="ev-step-8">Pregunta 8 de 11</div>
-            <h2 class="ev-title">Gestión de Seguridad y Salud en el Trabajo (SST)</h2>
-            <div class="ev-question">¿Cómo evalúas el rol del colaborador en la promoción de un entorno seguro, cumpliendo con las normas de bioseguridad, participando en programas preventivos y actuando de manera efectiva frente a situaciones de riesgo o emergencia?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[7]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[7]['PREGUNTA'] ?: $compDataSub[7]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 8, 'Sobresaliente')">
@@ -857,8 +877,8 @@ try {
                 <div class="ev-banner-body">En esta sección, queremos ir más allá del simple cumplimiento de tareas: buscamos descubrir cómo el talento del colaborador transforma la rutina en resultados extraordinarios. Evaluaremos cómo su desempeño impulsa un entorno de colaboración positiva y cómo aprovecha al máximo el tiempo y los recursos.</div>
             </div>
             <div class="ev-step" id="ev-step-9">Pregunta 9 de 11</div>
-            <h2 class="ev-title">Gestión de Relaciones Interpersonales</h2>
-            <div class="ev-question">En su día a día, el colaborador demuestra la capacidad de construir puentes de confianza y comunicación que fortalecen las relaciones con compañeros, líderes y otras partes interesadas. ¿Cómo calificarías su habilidad para resolver conflictos de forma creativa y generar un entorno laboral armónico que impulse la cultura organizacional?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[8]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[8]['PREGUNTA'] ?: $compDataSub[8]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 9, 'Sobresaliente')">
@@ -906,8 +926,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-10">
             <div class="ev-step" id="ev-step-10">Pregunta 10 de 11</div>
-            <h2 class="ev-title">Eficacia en la Ejecución de Responsabilidades y Contribución a los Resultados</h2>
-            <div class="ev-question">¿De qué manera el colaborador traduce sus responsabilidades en acciones que generan resultados tangibles, demostrando puntualidad, precisión y un impacto significativo en el cumplimiento de las metas organizacionales?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[9]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[9]['PREGUNTA'] ?: $compDataSub[9]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 10, 'Sobresaliente')">
@@ -955,8 +975,8 @@ try {
         </div>
         <div class="ev-section" id="ev-section-11">
             <div class="ev-step" id="ev-step-11">Pregunta 11 de 11</div>
-            <h2 class="ev-title">Gestión Eficiente del Tiempo y los Recursos</h2>
-            <div class="ev-question">En su rol, el colaborador organiza su tiempo y recursos con una visión estratégica, priorizando tareas clave y minimizando el desperdicio. ¿Cómo evaluarías su capacidad para cumplir plazos establecidos, optimizar recursos disponibles y entregar resultados alineados con las demandas del cargo?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataSub[10]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataSub[10]['PREGUNTA'] ?: $compDataSub[10]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 11, 'Sobresaliente')">

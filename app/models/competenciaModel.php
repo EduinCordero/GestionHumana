@@ -582,7 +582,8 @@ class competenciaModel extends mainModel {
      * Guarda una justificación para una respuesta extrema
      */
     public function guardarJustificacion(int $idRespuesta, string $justificacion): bool {
-        $conn = $this->conectar();
+        $conn         = $this->conectar();
+        $justificacion = $this->toOracle($justificacion);
         $sql  = "INSERT INTO VAADINWEB.HUMJUSTIFICACION_V2
                      (IDJUSTIFICACION, IDRESPUESTA, JUSTIFICACION)
                  VALUES (VAADINWEB.SEQ_HUMJUSTIFICACION_V2.NEXTVAL, :resp, :just)";
@@ -636,6 +637,14 @@ class competenciaModel extends mainModel {
             }
         }
         return $dict;
+    }
+
+    /**
+     * Devuelve todas las competencias (P1-P22) indexadas por NUM_PREGUNTA → NOMBRE
+     * Usado para FB_COMP_NAMES en feedback-view (cubre FL1, FL2 y EA)
+     */
+    public static function getDictAll(): array {
+        return (new self())->getDictPorNumPregunta();
     }
 
     /**

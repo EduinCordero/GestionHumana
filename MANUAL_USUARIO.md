@@ -90,7 +90,8 @@ Si es la primera vez que accede a la plataforma, debe activar su cuenta antes de
     <div class="mu-step-num">1</div>
     <div class="mu-step-body">
       <div class="mu-step-title">Abrir el sistema en su navegador</div>
-      <div class="mu-step-desc">Use Chrome, Edge o Firefox. Ingrese a la URL del sistema proporcionada por Gestión Humana.</div>
+      <div class="mu-step-desc">Use Chrome, Edge o Firefox. Ingrese a la URL del sistema proporcionada por Gestión Humana
+      o, de manera predeterminada, desde la Intranet de la institución, seleccionando el ícono “Evaluación de Desempeño”.</div>
     </div>
   </li>
   <li class="mu-step">

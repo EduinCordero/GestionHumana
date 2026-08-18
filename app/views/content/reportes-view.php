@@ -10,7 +10,8 @@ $idEmpleado          = $idEmpleado          ?? 0;
 $searchTerm          = $searchTerm          ?? '';
 $resultadosBusqueda  = $resultadosBusqueda  ?? [];
 $periodoActivo       = $periodoActivo       ?? null;
-$acuerdosColaborador = $acuerdosColaborador ?? [];
+$acuerdosColaborador   = $acuerdosColaborador   ?? [];
+$acuerdosColaboradorEA = $acuerdosColaboradorEA ?? [];
 $colsConMejora       = $colsConMejora       ?? [];
 $estadoPlanEquipo    = $estadoPlanEquipo    ?? [];
 
@@ -353,9 +354,10 @@ canvas { display: block; }
 
     <!-- Hero — mismo diseño que Feedback -->
     <?php
-    $cierreDt2 = $periodoActivo ? DateTime::createFromFormat('d/m/Y', $periodoActivo['FECHACIERRE']) : null;
-    $diasRest2 = $cierreDt2 ? ceil(($cierreDt2->getTimestamp() - time()) / 86400) : 0;
-    if ($diasRest2 <= 0)        { $colorP2='#dc2626'; $labelP2='Período cerrado'; }
+    $cierreDt2 = $periodoActivo ? DateTime::createFromFormat('d/m/Y H:i:s', $periodoActivo['FECHACIERRE'] . ' 23:59:59') : null;
+    $hoyDt2    = new DateTime();
+    $diasRest2 = $cierreDt2 ? ($cierreDt2 >= $hoyDt2 ? (int)$hoyDt2->diff($cierreDt2)->days : -1) : -1;
+    if ($diasRest2 < 0)         { $colorP2='#dc2626'; $labelP2='Período cerrado'; }
     elseif ($diasRest2 <= 3)    { $colorP2='#f97316'; $labelP2="Cierra en $diasRest2 día(s)"; }
     elseif ($diasRest2 <= 7)    { $colorP2='#eab308'; $labelP2="Cierra en $diasRest2 días"; }
     else                        { $colorP2='#0058af'; $labelP2="$diasRest2 días restantes"; }
@@ -861,11 +863,12 @@ canvas { display: block; }
         $mostrarTabLider = ($esLiderFuncional ?? false) && !empty($acuerdosLider);
         ?>
 
-        <?php if ($mostrarTabLider): ?>
+        <?php $mostrarTabsExtra = $mostrarTabLider || !empty($acuerdosColaboradorEA); ?>
+        <?php if ($mostrarTabsExtra): ?>
         <!-- ── Barra de subpestañas ── -->
         <div style="display:flex;gap:4px;background:#f8fafc;padding:5px;
                     border-radius:12px;border:1px solid var(--rep-border);
-                    margin-bottom:24px;width:fit-content;">
+                    margin-bottom:24px;width:fit-content;flex-wrap:wrap;">
             <button id="plan-subtab-colab" onclick="planSubSwitch('colab')"
                     style="padding:7px 20px;border-radius:9px;font-size:.84rem;font-weight:600;
                            cursor:pointer;border:none;font-family:inherit;transition:all .2s;
@@ -873,12 +876,22 @@ canvas { display: block; }
                            box-shadow:0 2px 8px rgba(0,88,175,.25);">
                 <?= icon('user', 14) ?> Como Colaborador
             </button>
+            <?php if ($mostrarTabLider): ?>
             <button id="plan-subtab-lider" onclick="planSubSwitch('lider')"
                     style="padding:7px 20px;border-radius:9px;font-size:.84rem;font-weight:600;
                            cursor:pointer;border:none;font-family:inherit;transition:all .2s;
                            background:transparent;color:#64748b;box-shadow:none;">
                 <?= icon('target', 14) ?> Como Líder
             </button>
+            <?php endif; ?>
+            <?php if (!empty($acuerdosColaboradorEA)): ?>
+            <button id="plan-subtab-ea" onclick="planSubSwitch('ea')"
+                    style="padding:7px 20px;border-radius:9px;font-size:.84rem;font-weight:600;
+                           cursor:pointer;border:none;font-family:inherit;transition:all .2s;
+                           background:transparent;color:#64748b;box-shadow:none;">
+                <?= icon('star', 14) ?> Experiencia Azul
+            </button>
+            <?php endif; ?>
         </div>
         <?php endif; ?>
 
@@ -915,8 +928,6 @@ canvas { display: block; }
                 4=>['bg'=>'#dcfce7','color'=>'#15803d'],
                 5=>['bg'=>'#f3e8ff','color'=>'#6b21a8'],
             ];
-            $porComp = [];
-            foreach ($acuerdosColaborador as $ac) { $porComp[$ac['NUM_COMPETENCIA']][] = $ac; }
         ?>
         <!-- Sub-encabezado sección colaborador -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;
@@ -932,93 +943,108 @@ canvas { display: block; }
                 </div>
             </div>
         </div>
-        <?php foreach ($porComp as $numComp => $acuerdos):
-            $nombreComp = $dictColabPlan[$numComp] ?? "Competencia $numComp";
-            $calRaw = $acuerdos[0]['CALIFICACION'] ?? '';
+        <?php
+        $estadoBorder = [
+            'PENDIENTE'  => ['border'=>'#fcd34d','bg'=>'#fffbeb','dot'=>'#d97706','bdl'=>'#f59e0b'],
+            'RESPONDIDO' => ['border'=>'#93c5fd','bg'=>'#eff6ff','dot'=>'#2563eb','bdl'=>'#3b82f6'],
+            'APROBADO'   => ['border'=>'#86efac','bg'=>'#f0fdf4','dot'=>'#16a34a','bdl'=>'#22c55e'],
+        ];
+        foreach ($acuerdosColaborador as $acIdx => $ac):
+            $dictColabPlan = $dictColabPlan ?? \app\models\reportModel::getDictColaborador();
+            $nombreComp = $dictColabPlan[$ac['NUM_COMPETENCIA']] ?? 'Competencia ' . $ac['NUM_COMPETENCIA'];
+            $calRaw = $ac['CALIFICACION'] ?? '';
+            $calTextMap = $calTextMap ?? ['Insuficiente'=>1,'Necesita Mejorar'=>2,'Aceptable'=>3,'Acorde'=>4,'Sobresaliente'=>5];
+            $calLabelsPlan = $calLabelsPlan ?? [1=>'Insuficiente',2=>'Necesita Mejorar',3=>'Aceptable',4=>'Acorde',5=>'Sobresaliente'];
+            $calColorsPlan = $calColorsPlan ?? [1=>['bg'=>'#fee2e2','color'=>'#991b1b'],2=>['bg'=>'#fef3c7','color'=>'#92400e'],3=>['bg'=>'#e0f2fe','color'=>'#0369a1'],4=>['bg'=>'#dcfce7','color'=>'#15803d'],5=>['bg'=>'#f3e8ff','color'=>'#6b21a8']];
             $cal = is_numeric($calRaw) ? (int)$calRaw : ($calTextMap[$calRaw] ?? 0);
             $cc  = $calColorsPlan[$cal] ?? ['bg'=>'#f1f5f9','color'=>'#475569'];
+            $est = $ac['ESTADO'] ?? 'PENDIENTE';
+            $ec  = $estadoBorder[$est] ?? $estadoBorder['PENDIENTE'];
+            $tieneMensaje = !empty(trim($ac['COMENTARIO_LIDER'] ?? ''));
+            $fbPartesPlan = explode(' ', $ac['FECHA_FEEDBACK'] ?? '');
+            $fbFechaPlan  = $fbPartesPlan[0] ?? '';
+            $fbHoraPlan   = $fbPartesPlan[1] ?? '';
+            $smartItems = [
+                [icon('ruler',     13),'Indicador',           $ac['INDICADOR']           ?? ''],
+                [icon('target',    13),'Meta',                $ac['META']                ?? ''],
+                [icon('calendar',  13),'Plazo',               $ac['PLAZO']               ?? ''],
+                [icon('search',    13),'Evidencia',           $ac['EVIDENCIA']           ?? ''],
+                [icon('handshake', 13),'Apoyo del líder',     $ac['APOYO_LIDER']         ?? ''],
+                [icon('list',      13),'Seguimiento sugerido',$ac['SEGUIMIENTO']         ?? ''],
+                [icon('check',     13),'Compromiso acordado', $ac['COMPROMISO_AJUSTADO'] ?? ''],
+            ];
+            $haySmartData = array_filter(array_column($smartItems, 2), fn($v) => !empty(trim($v ?? '')));
         ?>
-        <div class="rp-card" style="margin-bottom:18px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                <div style="width:8px;height:8px;border-radius:50%;background:var(--rep-accent);"></div>
-                <div>
-                    <div style="font-weight:700;"><?= htmlspecialchars($nombreComp) ?></div>
-                    <span style="font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;
-                                 background:<?= $cc['bg'] ?>;color:<?= $cc['color'] ?>;">
-                        <?= $calLabelsPlan[$cal] ?? '' ?>
-                    </span>
-                </div>
-            </div>
-            <?php foreach ($acuerdos as $ac): ?>
-            <div style="border:1.5px solid var(--rep-border);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+        <!-- Card colapsible Flujo 1 -->
+        <div style="border:1.5px solid <?= $ec['border'] ?>;border-left:4px solid <?= $ec['bdl'] ?>;
+                    border-radius:12px;background:<?= $ec['bg'] ?>;margin-bottom:12px;overflow:hidden;">
 
-                <!-- Objetivo -->
-                <div style="font-size:.85rem;font-weight:600;margin-bottom:8px;">
-                    <?= icon('target', 14) ?> <?= htmlspecialchars($ac['OBJETIVO']) ?>
-                </div>
-
-                <!-- Meta, asignación, estado -->
-                <div style="font-size:.75rem;color:var(--rep-muted);margin-bottom:10px;">
-                    Asignado por: <strong><?= htmlspecialchars($ac['NOMBRE_LIDER']) ?></strong>
-                    &nbsp;·&nbsp; <?= date('d/m/Y', strtotime($ac['FECHA_ASIGNACION'])) ?>
-                    &nbsp;·&nbsp;
-                    <?php
-                    if ($ac['ESTADO'] === 'APROBADO'):
-                        echo '<span style="font-weight:700;color:#005EB8;">' . icon('check-circle', 14) . ' Aprobado por tu líder</span>';
-                    elseif ($ac['ESTADO'] === 'RESPONDIDO'):
-                        echo '<span style="font-weight:700;color:#059669;">' . icon('check-circle', 14) . ' Respondido</span>';
-                    else:
-                        echo '<span style="font-weight:700;color:#d97706;">' . icon('clock', 14) . ' Pendiente</span>';
-                    endif;
-                    ?>
-                </div>
-
-                <!-- Cita de reunión con el líder -->
-                <?php if (!empty($ac['FECHA_FEEDBACK'])): ?>
-                <?php
-                    $fbPartesPlan = explode(' ', $ac['FECHA_FEEDBACK']);
-                    $fbFechaPlan  = $fbPartesPlan[0] ?? '';
-                    $fbHoraPlan   = $fbPartesPlan[1] ?? '';
-                ?>
-                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
-                            padding:10px 14px;margin-bottom:12px;font-size:.82rem;color:#1e40af;
-                            display:flex;align-items:center;gap:8px;">
-                    <?= icon('calendar', 14) ?> <strong>Reunión agendada:</strong>
-                    &nbsp;<?= $fbFechaPlan ?>
-                    <?php if ($fbHoraPlan): ?>
-                    &nbsp;<?= icon('clock', 14) ?> <?= $fbHoraPlan ?>
+            <!-- Cabecera (siempre visible) -->
+            <div onclick="mpToggle('mp1-<?= $acIdx ?>')"
+                 style="padding:14px 16px;cursor:pointer;display:flex;align-items:flex-start;gap:12px;">
+                <div style="flex:1;min-width:0;">
+                    <!-- Competencia + calificación -->
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+                        <span style="font-size:.7rem;font-weight:700;color:var(--rep-muted);
+                                     text-transform:uppercase;letter-spacing:.05em;"><?= htmlspecialchars($nombreComp) ?></span>
+                        <span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;
+                                     background:<?= $cc['bg'] ?>;color:<?= $cc['color'] ?>;"><?= $calLabelsPlan[$cal] ?? '' ?></span>
+                        <?php if ($tieneMensaje): ?>
+                        <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;
+                                     display:inline-block;box-shadow:0 0 0 3px rgba(245,158,11,.25);"
+                              title="Hay un comentario de tu líder"></span>
+                        <?php endif; ?>
+                    </div>
+                    <!-- Objetivo -->
+                    <div style="font-size:.88rem;font-weight:600;color:#1e293b;line-height:1.45;margin-bottom:6px;">
+                        <?= htmlspecialchars($ac['OBJETIVO']) ?>
+                    </div>
+                    <!-- Asignado por · fecha · estado -->
+                    <div style="font-size:.75rem;color:var(--rep-muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+                        <span>Asignado por: <strong><?= htmlspecialchars($ac['NOMBRE_LIDER']) ?></strong></span>
+                        <?php if (!empty($ac['FECHA_ASIGNACION'])): ?>
+                        <span>&middot; <?= date('d/m/Y', strtotime($ac['FECHA_ASIGNACION'])) ?></span>
+                        <?php endif; ?>
+                        <span>&middot;
+                        <?php if ($est === 'APROBADO'): ?>
+                            <strong style="color:#15803d;"><?= icon('check-circle', 12) ?> Aprobado</strong>
+                        <?php elseif ($est === 'RESPONDIDO'): ?>
+                            <strong style="color:#1d4ed8;"><?= icon('check-circle', 12) ?> Respondido</strong>
+                        <?php else: ?>
+                            <strong style="color:#d97706;"><?= icon('clock', 12) ?> Pendiente</strong>
+                        <?php endif; ?>
+                        </span>
+                    </div>
+                    <!-- Reunión agendada (siempre visible) -->
+                    <?php if ($fbFechaPlan): ?>
+                    <div style="margin-top:6px;font-size:.75rem;color:#1e40af;display:flex;align-items:center;gap:5px;">
+                        <?= icon('calendar', 12) ?> <strong>Reunión agendada:</strong>
+                        <?= htmlspecialchars($fbFechaPlan) ?>
+                        <?php if ($fbHoraPlan): ?> <?= icon('clock', 12) ?> <?= htmlspecialchars($fbHoraPlan) ?><?php endif; ?>
+                    </div>
                     <?php endif; ?>
                 </div>
-                <?php endif; ?>
+                <!-- Toggle arrow -->
+                <div id="mp1-arrow-<?= $acIdx ?>" style="flex-shrink:0;color:var(--rep-muted);transition:transform .2s;margin-top:2px;">
+                    <?= icon('chevron-down', 16) ?>
+                </div>
+            </div>
 
-                <!-- Campos SMART -->
-                <?php
-                $smartItems = [
-                    [icon('ruler',      13), 'Indicador',             $ac['INDICADOR']          ?? ''],
-                    [icon('target',     13), 'Meta',                  $ac['META']               ?? ''],
-                    [icon('calendar',   13), 'Plazo',                 $ac['PLAZO']              ?? ''],
-                    [icon('search',     13), 'Evidencia',             $ac['EVIDENCIA']          ?? ''],
-                    [icon('handshake',  13), 'Apoyo del líder',       $ac['APOYO_LIDER']        ?? ''],
-                    [icon('list',       13), 'Seguimiento sugerido',  $ac['SEGUIMIENTO']        ?? ''],
-                    [icon('check',      13), 'Compromiso acordado',   $ac['COMPROMISO_AJUSTADO']?? ''],
-                ];
-                $haySmartData = array_filter(array_column($smartItems, 2));
-                ?>
+            <!-- Detalle colapsible -->
+            <div id="mp1-<?= $acIdx ?>" style="display:none;border-top:1px solid <?= $ec['border'] ?>;padding:14px 16px;">
+
                 <?php if ($haySmartData): ?>
-                <div style="background:#f8fafc;border:1px solid var(--rep-border);border-radius:8px;
-                            padding:10px 14px;margin-bottom:12px;">
-                    <div style="font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-                                color:var(--rep-muted);margin-bottom:8px;">Detalle del objetivo SMART</div>
+                <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+                    <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                                color:var(--rep-muted);margin-bottom:8px;">Detalle SMART</div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                     <?php foreach ($smartItems as [$ico, $label, $val]): ?>
                         <?php if (!empty(trim($val ?? ''))): ?>
-                        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;">
-                            <div style="font-size:.68rem;font-weight:700;color:var(--rep-muted);margin-bottom:2px;">
+                        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:7px 10px;">
+                            <div style="font-size:.66rem;font-weight:700;color:var(--rep-muted);margin-bottom:2px;">
                                 <?= $ico ?> <?= $label ?>
                             </div>
-                            <div style="font-size:.8rem;color:var(--rep-text);">
-                                <?= htmlspecialchars($val) ?>
-                            </div>
+                            <div style="font-size:.8rem;color:var(--rep-text);"><?= htmlspecialchars($val) ?></div>
                         </div>
                         <?php endif; ?>
                     <?php endforeach; ?>
@@ -1026,23 +1052,14 @@ canvas { display: block; }
                 </div>
                 <?php endif; ?>
 
-                <!-- Plan de acción -->
-                <?php if ($ac['ESTADO'] === 'APROBADO'): ?>
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:6px;">
+                <?php if ($est === 'APROBADO' || $est === 'RESPONDIDO'): ?>
+                <?php if (!empty($ac['PLAN_ACCION'])): ?>
+                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:8px;">
                     <strong>Tu plan de acción:</strong><br>
                     <?= nl2br(htmlspecialchars($ac['PLAN_ACCION'])) ?>
-                </div>
-                <?php if (!empty($ac['COMENTARIO_LIDER'])): ?>
-                <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#1e40af;">
-                    <?= icon('message-circle', 14) ?> <strong>Comentario del líder:</strong> <?= htmlspecialchars($ac['COMENTARIO_LIDER']) ?>
                 </div>
                 <?php endif; ?>
-                <?php elseif ($ac['ESTADO'] === 'RESPONDIDO'): ?>
-                <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:6px;">
-                    <strong>Tu plan de acción:</strong><br>
-                    <?= nl2br(htmlspecialchars($ac['PLAN_ACCION'])) ?>
-                </div>
-                <?php if (!empty($ac['COMENTARIO_LIDER'])): ?>
+                <?php if ($tieneMensaje): ?>
                 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#1e40af;">
                     <?= icon('message-circle', 14) ?> <strong>Comentario del líder:</strong> <?= htmlspecialchars($ac['COMENTARIO_LIDER']) ?>
                 </div>
@@ -1053,9 +1070,8 @@ canvas { display: block; }
                               placeholder="Describe cómo vas a mejorar en esta competencia..."
                               style="width:100%;padding:9px 12px;border:1.5px solid var(--rep-border);
                                      border-radius:8px;font-size:.84rem;font-family:inherit;
-                                     resize:vertical;outline:none;"></textarea>
-                    <button type="button"
-                            onclick="guardarPlanAjax(<?= $ac['IDACUERDO'] ?>, this)"
+                                     resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                    <button type="button" onclick="guardarPlanAjax(<?= $ac['IDACUERDO'] ?>, this)"
                             style="margin-top:8px;padding:7px 18px;background:var(--rep-accent);
                                    color:#fff;border:none;border-radius:8px;font-weight:600;
                                    font-size:.84rem;cursor:pointer;font-family:inherit;">
@@ -1064,7 +1080,6 @@ canvas { display: block; }
                 </div>
                 <?php endif; ?>
             </div>
-            <?php endforeach; ?>
         </div>
         <?php endforeach; ?>
         <?php else: ?>
@@ -1132,80 +1147,100 @@ canvas { display: block; }
                     4=>['bg'=>'#dcfce7','color'=>'#15803d'],
                     5=>['bg'=>'#f3e8ff','color'=>'#6b21a8'],
                 ];
-                $porCompL2 = [];
-                foreach ($acuerdosLider as $acL) {
-                    $porCompL2[$acL['NUM_COMPETENCIA']][] = $acL;
-                }
             ?>
-            <?php foreach ($porCompL2 as $numCompL2 => $acuerdosL2):
-                $nombreCompL2 = $dictLiderPlan[$numCompL2] ?? "Competencia $numCompL2";
-                $calRawL2     = $acuerdosL2[0]['CALIFICACION'] ?? 0;
-                $calL2        = is_numeric($calRawL2) ? (int)$calRawL2 : 0;
-                $ccL2         = $calColorsPlanL2[$calL2] ?? ['bg'=>'#f1f5f9','color'=>'#475569'];
+            <?php
+            $estadoBorderL2 = [
+                'PENDIENTE'  => ['border'=>'#fcd34d','bg'=>'#fffbeb','bdl'=>'#f59e0b'],
+                'RESPONDIDO' => ['border'=>'#93c5fd','bg'=>'#eff6ff','bdl'=>'#3b82f6'],
+                'APROBADO'   => ['border'=>'#86efac','bg'=>'#f0fdf4','bdl'=>'#22c55e'],
+            ];
+            foreach ($acuerdosLider as $acLIdx => $acL):
+                $nombreCompL2  = $dictLiderPlan[$acL['NUM_COMPETENCIA']] ?? 'Competencia ' . $acL['NUM_COMPETENCIA'];
+                $calRawL2      = $acL['CALIFICACION'] ?? 0;
+                $calL2         = is_numeric($calRawL2) ? (int)$calRawL2 : 0;
+                $ccL2          = $calColorsPlanL2[$calL2] ?? ['bg'=>'#f1f5f9','color'=>'#475569'];
+                $estL2         = $acL['ESTADO'] ?? 'PENDIENTE';
+                $ecL2          = $estadoBorderL2[$estL2] ?? $estadoBorderL2['PENDIENTE'];
+                $tieneMensajeL2= !empty(trim($acL['COMENTARIO_LIDER'] ?? ''));
+                $fbPartesL2    = explode(' ', $acL['FECHA_FEEDBACK'] ?? '');
+                $fbFechaL2     = $fbPartesL2[0] ?? '';
+                $fbHoraL2      = $fbPartesL2[1] ?? '';
+                $smartL2 = [
+                    [icon('ruler',     13),'Indicador',           $acL['INDICADOR']           ?? ''],
+                    [icon('target',    13),'Meta',                $acL['META']                ?? ''],
+                    [icon('calendar',  13),'Plazo',               $acL['PLAZO']               ?? ''],
+                    [icon('search',    13),'Evidencia',           $acL['EVIDENCIA']           ?? ''],
+                    [icon('handshake', 13),'Apoyo del director',  $acL['APOYO_LIDER']         ?? ''],
+                    [icon('list',      13),'Seguimiento sugerido',$acL['SEGUIMIENTO']         ?? ''],
+                    [icon('check',     13),'Compromiso acordado', $acL['COMPROMISO_AJUSTADO'] ?? ''],
+                ];
+                $haySmartL2 = array_filter(array_column($smartL2, 2), fn($v) => !empty(trim($v ?? '')));
             ?>
-            <div class="rp-card" style="margin-bottom:18px;border-left:3px solid #0058af;">
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                    <div style="width:8px;height:8px;border-radius:50%;background:#0058af;"></div>
-                    <div>
-                        <div style="font-weight:700;"><?= htmlspecialchars($nombreCompL2) ?></div>
-                        <span style="font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:20px;
-                                     background:<?= $ccL2['bg'] ?>;color:<?= $ccL2['color'] ?>;">
-                            <?= $calLabelsPlanL2[$calL2] ?? '' ?>
-                        </span>
+            <!-- Card colapsible Flujo 2 -->
+            <div style="border:1.5px solid <?= $ecL2['border'] ?>;border-left:4px solid <?= $ecL2['bdl'] ?>;
+                        border-radius:12px;background:<?= $ecL2['bg'] ?>;margin-bottom:12px;overflow:hidden;">
+
+                <!-- Cabecera (siempre visible) -->
+                <div onclick="mpToggle('mp2-<?= $acLIdx ?>')"
+                     style="padding:14px 16px;cursor:pointer;display:flex;align-items:flex-start;gap:12px;">
+                    <div style="flex:1;min-width:0;">
+                        <!-- Competencia + calificación -->
+                        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+                            <span style="font-size:.7rem;font-weight:700;color:var(--rep-muted);
+                                         text-transform:uppercase;letter-spacing:.05em;"><?= htmlspecialchars($nombreCompL2) ?></span>
+                            <span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;
+                                         background:<?= $ccL2['bg'] ?>;color:<?= $ccL2['color'] ?>;"><?= $calLabelsPlanL2[$calL2] ?? '' ?></span>
+                            <?php if ($tieneMensajeL2): ?>
+                            <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;
+                                         display:inline-block;box-shadow:0 0 0 3px rgba(245,158,11,.25);"
+                                  title="Hay un comentario de tu director"></span>
+                            <?php endif; ?>
+                        </div>
+                        <!-- Objetivo -->
+                        <div style="font-size:.88rem;font-weight:600;color:#1e293b;line-height:1.45;margin-bottom:6px;">
+                            <?= htmlspecialchars($acL['OBJETIVO']) ?>
+                        </div>
+                        <!-- Asignado por · estado -->
+                        <div style="font-size:.75rem;color:var(--rep-muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+                            <span>Asignado por: <strong><?= htmlspecialchars($acL['NOMBRE_LIDER']) ?></strong></span>
+                            <span>&middot;
+                            <?php if ($estL2 === 'APROBADO'): ?>
+                                <strong style="color:#15803d;"><?= icon('check-circle', 12) ?> Aprobado</strong>
+                            <?php elseif ($estL2 === 'RESPONDIDO'): ?>
+                                <strong style="color:#1d4ed8;"><?= icon('check-circle', 12) ?> Respondido</strong>
+                            <?php else: ?>
+                                <strong style="color:#d97706;"><?= icon('clock', 12) ?> Pendiente</strong>
+                            <?php endif; ?>
+                            </span>
+                        </div>
+                        <!-- Reunión agendada (siempre visible) -->
+                        <?php if ($fbFechaL2): ?>
+                        <div style="margin-top:6px;font-size:.75rem;color:#1e40af;display:flex;align-items:center;gap:5px;">
+                            <?= icon('calendar', 12) ?> <strong>Reunión agendada:</strong>
+                            <?= htmlspecialchars($fbFechaL2) ?>
+                            <?php if ($fbHoraL2): ?> <?= icon('clock', 12) ?> <?= htmlspecialchars($fbHoraL2) ?><?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <!-- Toggle arrow -->
+                    <div id="mp2-arrow-<?= $acLIdx ?>" style="flex-shrink:0;color:var(--rep-muted);transition:transform .2s;margin-top:2px;">
+                        <?= icon('chevron-down', 16) ?>
                     </div>
                 </div>
 
-                <?php foreach ($acuerdosL2 as $acL): ?>
-                <div style="border:1.5px solid var(--rep-border);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+                <!-- Detalle colapsible -->
+                <div id="mp2-<?= $acLIdx ?>" style="display:none;border-top:1px solid <?= $ecL2['border'] ?>;padding:14px 16px;">
 
-                    <!-- Objetivo -->
-                    <div style="font-size:.85rem;font-weight:600;margin-bottom:8px;">
-                        <?= icon('target', 14) ?> <?= htmlspecialchars($acL['OBJETIVO']) ?>
-                    </div>
-
-                    <!-- Asignado por / estado -->
-                    <div style="font-size:.75rem;color:var(--rep-muted);margin-bottom:10px;">
-                        Asignado por: <strong><?= htmlspecialchars($acL['NOMBRE_LIDER']) ?></strong>
-                        &nbsp;·&nbsp;
-                        <?php
-                        if ($acL['ESTADO'] === 'APROBADO'):
-                            echo '<span style="font-weight:700;color:#005EB8;">' . icon('check-circle', 14) . ' Aprobado por tu director</span>';
-                        elseif ($acL['ESTADO'] === 'RESPONDIDO'):
-                            echo '<span style="font-weight:700;color:#059669;">' . icon('check-circle', 14) . ' Respondido</span>';
-                        else:
-                            echo '<span style="font-weight:700;color:#d97706;">' . icon('clock', 14) . ' Pendiente</span>';
-                        endif;
-                        ?>
-                    </div>
-
-                    <!-- Campos SMART -->
-                    <?php
-                    $smartL2 = [
-                        [icon('ruler',     13), 'Indicador',            $acL['INDICADOR']           ?? ''],
-                        [icon('target',    13), 'Meta',                 $acL['META']                ?? ''],
-                        [icon('calendar',  13), 'Plazo',                $acL['PLAZO']               ?? ''],
-                        [icon('search',    13), 'Evidencia',            $acL['EVIDENCIA']           ?? ''],
-                        [icon('handshake', 13), 'Apoyo del director',   $acL['APOYO_LIDER']         ?? ''],
-                        [icon('list',      13), 'Seguimiento sugerido', $acL['SEGUIMIENTO']         ?? ''],
-                        [icon('check',     13), 'Compromiso acordado',  $acL['COMPROMISO_AJUSTADO'] ?? ''],
-                    ];
-                    $haySmartL2 = array_filter(array_column($smartL2, 2), fn($v) => !empty(trim($v ?? '')));
-                    ?>
                     <?php if (!empty($haySmartL2)): ?>
-                    <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:8px;
-                                padding:10px 14px;margin-bottom:12px;">
-                        <div style="font-size:.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-                                    color:#0058af;margin-bottom:8px;">Detalle del objetivo</div>
+                    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+                        <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                                    color:#0058af;margin-bottom:8px;">Detalle SMART</div>
                         <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
                         <?php foreach ($smartL2 as [$ico, $label, $val]): ?>
                             <?php if (!empty(trim($val ?? ''))): ?>
-                            <div style="background:#fff;border:1px solid #bfdbfe;border-radius:6px;padding:7px 10px;">
-                                <div style="font-size:.68rem;font-weight:700;color:#0058af;margin-bottom:2px;">
-                                    <?= $ico ?> <?= $label ?>
-                                </div>
-                                <div style="font-size:.8rem;color:var(--rep-text);">
-                                    <?= htmlspecialchars($val) ?>
-                                </div>
+                            <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:6px;padding:7px 10px;">
+                                <div style="font-size:.66rem;font-weight:700;color:#0058af;margin-bottom:2px;"><?= $ico ?> <?= $label ?></div>
+                                <div style="font-size:.8rem;color:var(--rep-text);"><?= htmlspecialchars($val) ?></div>
                             </div>
                             <?php endif; ?>
                         <?php endforeach; ?>
@@ -1213,33 +1248,15 @@ canvas { display: block; }
                     </div>
                     <?php endif; ?>
 
-                    <!-- Plan de acción -->
-                    <?php if ($acL['ESTADO'] === 'APROBADO'): ?>
-                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-                                padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:6px;">
-                        <strong>Tu plan de acción:</strong><br>
-                        <?= nl2br(htmlspecialchars($acL['PLAN_ACCION'])) ?>
-                    </div>
-                    <?php if (!empty($acL['COMENTARIO_LIDER'])): ?>
-                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
-                                padding:8px 12px;font-size:.82rem;color:#1e40af;">
-                        <?= icon('message-circle', 14) ?>
-                        <strong>Comentario del director:</strong>
-                        <?= htmlspecialchars($acL['COMENTARIO_LIDER']) ?>
+                    <?php if ($estL2 === 'APROBADO' || $estL2 === 'RESPONDIDO'): ?>
+                    <?php if (!empty($acL['PLAN_ACCION'])): ?>
+                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:8px;">
+                        <strong>Tu plan de acción:</strong><br><?= nl2br(htmlspecialchars($acL['PLAN_ACCION'])) ?>
                     </div>
                     <?php endif; ?>
-                    <?php elseif ($acL['ESTADO'] === 'RESPONDIDO'): ?>
-                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-                                padding:10px 12px;font-size:.84rem;color:#166534;margin-bottom:6px;">
-                        <strong>Tu plan de acción:</strong><br>
-                        <?= nl2br(htmlspecialchars($acL['PLAN_ACCION'])) ?>
-                    </div>
-                    <?php if (!empty($acL['COMENTARIO_LIDER'])): ?>
-                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
-                                padding:8px 12px;font-size:.82rem;color:#1e40af;">
-                        <?= icon('message-circle', 14) ?>
-                        <strong>Comentario del director:</strong>
-                        <?= htmlspecialchars($acL['COMENTARIO_LIDER']) ?>
+                    <?php if ($tieneMensajeL2): ?>
+                    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#1e40af;">
+                        <?= icon('message-circle', 14) ?> <strong>Comentario del director:</strong> <?= htmlspecialchars($acL['COMENTARIO_LIDER']) ?>
                     </div>
                     <?php endif; ?>
                     <?php else: ?>
@@ -1248,9 +1265,8 @@ canvas { display: block; }
                                   placeholder="Describe cómo vas a trabajar en esta competencia de liderazgo..."
                                   style="width:100%;padding:9px 12px;border:1.5px solid var(--rep-border);
                                          border-radius:8px;font-size:.84rem;font-family:inherit;
-                                         resize:vertical;outline:none;"></textarea>
-                        <button type="button"
-                                onclick="guardarPlanL2Ajax(<?= $acL['IDACUERDO'] ?>, this)"
+                                         resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                        <button type="button" onclick="guardarPlanL2Ajax(<?= $acL['IDACUERDO'] ?>, this)"
                                 style="margin-top:8px;padding:7px 18px;background:linear-gradient(135deg,#0058af,#2563eb);
                                        color:#fff;border:none;border-radius:8px;font-weight:600;
                                        font-size:.84rem;cursor:pointer;font-family:inherit;">
@@ -1258,15 +1274,193 @@ canvas { display: block; }
                         </button>
                     </div>
                     <?php endif; ?>
-
                 </div>
-                <?php endforeach; ?>
             </div>
             <?php endforeach; ?>
             <?php endif; ?>
 
         </div><!-- /plan-sub-lider -->
         <?php endif; ?>
+
+        <!-- ══ SUBPANEL: EXPERIENCIA AZUL ══ -->
+        <?php if (!empty($acuerdosColaboradorEA)): ?>
+        <div id="plan-sub-ea" style="display:none;">
+
+        <!-- Sub-encabezado EA -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;
+                    padding-bottom:14px;border-bottom:2px solid #bae6fd;">
+            <div style="width:36px;height:36px;border-radius:10px;
+                        background:linear-gradient(135deg,#0891b2,#06b6d4);
+                        display:flex;align-items:center;justify-content:center;
+                        flex-shrink:0;"><?= icon('star', 18, '#fff') ?></div>
+            <div>
+                <div style="font-size:1rem;font-weight:700;color:#0c4a6e;">Experiencia Azul</div>
+                <div style="font-size:.82rem;color:#0369a1;margin-top:2px;">
+                    Objetivos asignados por tu líder · Competencias asistenciales EA
+                </div>
+            </div>
+        </div>
+
+        <?php
+        // Verificar si el colaborador ya firmó el recibido EA
+        $firmadoEAColab = !empty($acuerdosColaboradorEA)
+            && (int)($acuerdosColaboradorEA[0]['FIRMADO_COLAB'] ?? 0) === 1;
+        if (!$firmadoEAColab): ?>
+        <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:14px;
+                    padding:20px 24px;margin-bottom:20px;display:flex;align-items:center;gap:14px;">
+            <div style="flex-shrink:0;"><i class="ti ti-lock" style="font-size:1.6rem;color:#d97706;"></i></div>
+            <div>
+                <div style="font-weight:700;color:#92400e;font-size:.95rem;margin-bottom:4px;">
+                    Objetivos EA pendientes por recibir
+                </div>
+                <div style="color:#b45309;font-size:.84rem;line-height:1.5;">
+                    Tu líder te ha asignado objetivos de Experiencia Azul. Para visualizarlos debes
+                    <strong>firmar el recibido del feedback EA</strong> en la sesión con tu líder.
+                </div>
+            </div>
+        </div>
+        <?php else:
+        $estadoBorderEA = [
+            'PENDIENTE'  => ['border'=>'#fcd34d','bg'=>'#fffbeb','bdl'=>'#f59e0b'],
+            'RESPONDIDO' => ['border'=>'#7dd3fc','bg'=>'#f0f9ff','bdl'=>'#38bdf8'],
+            'APROBADO'   => ['border'=>'#6ee7b7','bg'=>'#ecfdf5','bdl'=>'#34d399'],
+        ];
+        $dictEAPlan = [
+            17=>'Vocación de servicio', 18=>'Calidez en la atención', 19=>'Comunicación efectiva',
+            20=>'Trabajo en equipo',    21=>'Proactividad',           22=>'Adaptabilidad'
+        ];
+        $calLabelsEA = [
+            1=>'Crítico', 2=>'Inconsistente', 3=>'Esperado', 4=>'Consistente', 5=>'Referente'
+        ];
+        $calColorsEA = [
+            1=>['bg'=>'#fee2e2','color'=>'#991b1b'],
+            2=>['bg'=>'#fef3c7','color'=>'#92400e'],
+            3=>['bg'=>'#e0f2fe','color'=>'#0369a1'],
+            4=>['bg'=>'#dcfce7','color'=>'#15803d'],
+            5=>['bg'=>'#f0fdfa','color'=>'#0f766e'],
+        ];
+        foreach ($acuerdosColaboradorEA as $eaIdx => $acEA):
+            $nombreCompEA = $dictEAPlan[$acEA['NUM_COMPETENCIA']] ?? 'Competencia EA ' . $acEA['NUM_COMPETENCIA'];
+            $calRawEA     = $acEA['CALIFICACION'] ?? '';
+            $calEA        = is_numeric($calRawEA) ? (int)$calRawEA : 0;
+            $ccEA         = $calColorsEA[$calEA]  ?? ['bg'=>'#f1f5f9','color'=>'#475569'];
+            $estEA        = $acEA['ESTADO'] ?? 'PENDIENTE';
+            $ecEA         = $estadoBorderEA[$estEA] ?? $estadoBorderEA['PENDIENTE'];
+            $tieneMensajeEA = !empty(trim($acEA['COMENTARIO_LIDER'] ?? ''));
+            $fbPartesEA   = explode(' ', $acEA['FECHA_FEEDBACK'] ?? '');
+            $fbFechaEA    = $fbPartesEA[0] ?? '';
+            $fbHoraEA     = $fbPartesEA[1] ?? '';
+            $smartEA = [
+                [icon('ruler',     13),'Indicador',           $acEA['INDICADOR']           ?? ''],
+                [icon('target',    13),'Meta',                $acEA['META']                ?? ''],
+                [icon('calendar',  13),'Plazo',               $acEA['PLAZO']               ?? ''],
+                [icon('search',    13),'Evidencia',           $acEA['EVIDENCIA']           ?? ''],
+                [icon('handshake', 13),'Apoyo del líder',     $acEA['APOYO_LIDER']         ?? ''],
+                [icon('list',      13),'Seguimiento sugerido',$acEA['SEGUIMIENTO']         ?? ''],
+                [icon('check',     13),'Compromiso acordado', $acEA['COMPROMISO_AJUSTADO'] ?? ''],
+            ];
+            $haySmartEA = array_filter(array_column($smartEA, 2), fn($v) => !empty(trim($v ?? '')));
+        ?>
+        <!-- Card colapsible EA -->
+        <div style="border:1.5px solid <?= $ecEA['border'] ?>;border-left:4px solid <?= $ecEA['bdl'] ?>;
+                    border-radius:12px;background:<?= $ecEA['bg'] ?>;margin-bottom:12px;overflow:hidden;">
+
+            <!-- Cabecera (siempre visible) -->
+            <div onclick="mpToggle('mpea-<?= $eaIdx ?>')"
+                 style="padding:14px 16px;cursor:pointer;display:flex;align-items:flex-start;gap:12px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+                        <span style="font-size:.7rem;font-weight:700;color:#0369a1;
+                                     text-transform:uppercase;letter-spacing:.05em;"><?= htmlspecialchars($nombreCompEA) ?></span>
+                        <span style="font-size:.68rem;font-weight:700;padding:1px 7px;border-radius:20px;
+                                     background:<?= $ccEA['bg'] ?>;color:<?= $ccEA['color'] ?>;"><?= $calLabelsEA[$calEA] ?? '' ?></span>
+                        <?php if ($tieneMensajeEA): ?>
+                        <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;
+                                     display:inline-block;box-shadow:0 0 0 3px rgba(245,158,11,.25);"
+                              title="Hay un comentario de tu líder"></span>
+                        <?php endif; ?>
+                    </div>
+                    <div style="font-size:.88rem;font-weight:600;color:#0c4a6e;line-height:1.45;margin-bottom:6px;">
+                        <?= htmlspecialchars($acEA['OBJETIVO']) ?>
+                    </div>
+                    <div style="font-size:.75rem;color:#0369a1;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;">
+                        <span>Asignado por: <strong><?= htmlspecialchars($acEA['NOMBRE_LIDER']) ?></strong></span>
+                        <span>&middot;
+                        <?php if ($estEA === 'APROBADO'): ?>
+                            <strong style="color:#0f766e;"><?= icon('check-circle', 12) ?> Aprobado</strong>
+                        <?php elseif ($estEA === 'RESPONDIDO'): ?>
+                            <strong style="color:#0891b2;"><?= icon('check-circle', 12) ?> Respondido</strong>
+                        <?php else: ?>
+                            <strong style="color:#d97706;"><?= icon('clock', 12) ?> Pendiente</strong>
+                        <?php endif; ?>
+                        </span>
+                    </div>
+                    <?php if ($fbFechaEA): ?>
+                    <div style="margin-top:6px;font-size:.75rem;color:#0369a1;display:flex;align-items:center;gap:5px;">
+                        <?= icon('calendar', 12) ?> <strong>Reunión agendada:</strong>
+                        <?= htmlspecialchars($fbFechaEA) ?>
+                        <?php if ($fbHoraEA): ?> <?= icon('clock', 12) ?> <?= htmlspecialchars($fbHoraEA) ?><?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div id="mpea-arrow-<?= $eaIdx ?>" style="flex-shrink:0;color:#0369a1;transition:transform .2s;margin-top:2px;">
+                    <?= icon('chevron-down', 16) ?>
+                </div>
+            </div>
+
+            <!-- Detalle colapsible -->
+            <div id="mpea-<?= $eaIdx ?>" style="display:none;border-top:1px solid <?= $ecEA['border'] ?>;padding:14px 16px;">
+
+                <?php if (!empty($haySmartEA)): ?>
+                <div style="background:#fff;border:1px solid #bae6fd;border-radius:8px;padding:10px 14px;margin-bottom:12px;">
+                    <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+                                color:#0369a1;margin-bottom:8px;">Detalle SMART</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <?php foreach ($smartEA as [$ico, $label, $val]): ?>
+                        <?php if (!empty(trim($val ?? ''))): ?>
+                        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:7px 10px;">
+                            <div style="font-size:.66rem;font-weight:700;color:#0369a1;margin-bottom:2px;"><?= $ico ?> <?= $label ?></div>
+                            <div style="font-size:.8rem;color:var(--rep-text);"><?= htmlspecialchars($val) ?></div>
+                        </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+                <?php if ($estEA === 'APROBADO' || $estEA === 'RESPONDIDO'): ?>
+                <?php if (!empty($acEA['PLAN_ACCION'])): ?>
+                <div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 12px;font-size:.84rem;color:#065f46;margin-bottom:8px;">
+                    <strong>Tu plan de acción:</strong><br><?= nl2br(htmlspecialchars($acEA['PLAN_ACCION'])) ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($tieneMensajeEA): ?>
+                <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:8px 12px;font-size:.82rem;color:#0369a1;">
+                    <?= icon('message-circle', 14) ?> <strong>Comentario del líder:</strong> <?= htmlspecialchars($acEA['COMENTARIO_LIDER']) ?>
+                </div>
+                <?php endif; ?>
+                <?php else: ?>
+                <div id="plan-form-ea-<?= $acEA['IDACUERDO'] ?>">
+                    <textarea id="plan-text-ea-<?= $acEA['IDACUERDO'] ?>" rows="3" maxlength="1000"
+                              placeholder="Describe cómo vas a mejorar en esta competencia de experiencia azul..."
+                              style="width:100%;padding:9px 12px;border:1.5px solid #bae6fd;
+                                     border-radius:8px;font-size:.84rem;font-family:inherit;
+                                     resize:vertical;outline:none;box-sizing:border-box;"></textarea>
+                    <button type="button" onclick="guardarPlanEAAjax(<?= $acEA['IDACUERDO'] ?>, this)"
+                            style="margin-top:8px;padding:7px 18px;background:linear-gradient(135deg,#0891b2,#06b6d4);
+                                   color:#fff;border:none;border-radius:8px;font-weight:600;
+                                   font-size:.84rem;cursor:pointer;font-family:inherit;">
+                        <?= icon('save', 14) ?> Guardar plan de acción
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; // $firmadoEAColab ?>
+
+        </div><!-- /plan-sub-ea -->
+        <?php endif; // !empty($acuerdosColaboradorEA) ?>
 
     </div><!-- /rp-plan -->
 
@@ -1728,12 +1922,26 @@ canvas { display: block; }
         _fetchGuardarPlan(idAcuerdo, textarea.value.trim(), btn, textoOrigBtn, 'plan-form-l2-');
     };
 
+    // ── Guardar plan EA (P17-P22) ─────────────────────────────────────────────
+    window.guardarPlanEAAjax = function(idAcuerdo, btn) {
+        const textarea = document.getElementById('plan-text-ea-' + idAcuerdo);
+        if (!textarea || !textarea.value.trim()) {
+            Swal.fire({ icon: 'warning', title: 'Campo vacío',
+                text: 'Por favor escribe tu plan de acción antes de guardar.',
+                confirmButtonColor: '#0891b2', confirmButtonText: 'Entendido' });
+            return;
+        }
+        const textoOrigBtn = btn.textContent;
+        btn.disabled    = true;
+        btn.textContent = 'Guardando...';
+        _fetchGuardarPlan(idAcuerdo, textarea.value.trim(), btn, textoOrigBtn, 'plan-form-ea-');
+    };
+
     // ── Subpestañas Mi Plan de Mejora ────────────────────────────────────────
     // Activar subpestaña por parámetro URL (?sub=lider o ?sub=colab)
     (function() {
         const urlSub = new URLSearchParams(window.location.search).get('sub');
-        if (urlSub === 'lider' || urlSub === 'colab') {
-            // Esperar a que el DOM esté listo y el tab plan esté activo
+        if (urlSub === 'lider' || urlSub === 'colab' || urlSub === 'ea') {
             setTimeout(function() {
                 if (typeof planSubSwitch === 'function') planSubSwitch(urlSub);
             }, 100);
@@ -1741,22 +1949,35 @@ canvas { display: block; }
     })();
 
     window.planSubSwitch = function(tab) {
-        const isColab = tab === 'colab';
-        const pColab  = document.getElementById('plan-sub-colab');
-        const pLider  = document.getElementById('plan-sub-lider');
-        if (pColab) pColab.style.display = isColab ? '' : 'none';
-        if (pLider) pLider.style.display = isColab ? 'none' : '';
-        const btns = {
-            colab: document.getElementById('plan-subtab-colab'),
-            lider: document.getElementById('plan-subtab-lider')
-        };
-        Object.entries(btns).forEach(([key, btn]) => {
+        const panels = { colab: 'plan-sub-colab', lider: 'plan-sub-lider', ea: 'plan-sub-ea' };
+        Object.entries(panels).forEach(([key, id]) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = key === tab ? '' : 'none';
+        });
+        const btns = { colab: 'plan-subtab-colab', lider: 'plan-subtab-lider', ea: 'plan-subtab-ea' };
+        Object.entries(btns).forEach(([key, id]) => {
+            const btn = document.getElementById(id);
             if (!btn) return;
             const active = key === tab;
-            btn.style.background = active ? 'linear-gradient(135deg,#0058af,#2563eb)' : 'transparent';
-            btn.style.color      = active ? '#fff' : '#64748b';
-            btn.style.boxShadow  = active ? '0 2px 8px rgba(0,88,175,.25)' : 'none';
+            btn.style.background = active
+                ? (key === 'ea' ? 'linear-gradient(135deg,#0891b2,#06b6d4)' : 'linear-gradient(135deg,#0058af,#2563eb)')
+                : 'transparent';
+            btn.style.color     = active ? '#fff' : '#64748b';
+            btn.style.boxShadow = active ? '0 2px 8px rgba(0,88,175,.25)' : 'none';
         });
+    };
+
+    window.mpToggle = function(id) {
+        const panel = document.getElementById(id);
+        if (!panel) return;
+        const open  = panel.style.display !== 'none';
+        panel.style.display = open ? 'none' : '';
+        let prefix, key;
+        if (id.startsWith('mpea-')) { prefix = 'mpea-arrow-'; key = id.replace('mpea-', ''); }
+        else if (id.startsWith('mp2-')) { prefix = 'mp2-arrow-'; key = id.replace('mp2-', ''); }
+        else { prefix = 'mp1-arrow-'; key = id.replace('mp1-', ''); }
+        const arrow = document.getElementById(prefix + key);
+        if (arrow) arrow.style.transform = open ? '' : 'rotate(180deg)';
     };
 
 })();

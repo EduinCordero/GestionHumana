@@ -69,6 +69,7 @@ class feedbackController extends mainModel {
                 'config'         => $config,
                 'esDirector'     => false,
                 'lideresACargo'  => [],
+                'equipoEA'       => [],
                 'acuerdosLider'  => [],
                 'feedbackActivo' => false,
                 'esAdmin'        => false,
@@ -86,7 +87,9 @@ class feedbackController extends mainModel {
         // También responder JSON si viene action en GET (fetch puede no enviar X-Requested-With)
         $isGetAction = isset($_GET['action']) && in_array($_GET['action'], [
             'getCalificaciones','getObjetivos','getAcuerdos',
-            'getCalificacionesLider','getLideresACargo','getAcuerdosLider'
+            'getCalificacionesLider','getLideresACargo','getAcuerdosLider',
+            'getCalificacionesEA','getConsolidadoColaborador',
+            'getConsolidadoLider','getConsolidadoEA'
         ]);
 
         if (($isAjax || $isGetAction) && isset($_GET['action'])) {
@@ -170,6 +173,57 @@ class feedbackController extends mainModel {
                 echo json_encode($lideres);
                 exit();
             }
+
+            // ── Consolidado previo al feedback: calificaciones + justificaciones ─
+            if ($_GET['action'] === 'getConsolidadoColaborador' && isset($_GET['idEmpleado'])) {
+                $datos = $this->modelo->getConsolidadoParaFeedback(
+                    (int)$_GET['idEmpleado'],
+                    $idempleado,
+                    (int)$periodoActivo['IDPERIODO']
+                );
+                echo json_encode($datos, JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+
+            // ── Flujo 2: consolidado P12-P16 + justificaciones para vista previa ─
+            if ($_GET['action'] === 'getConsolidadoLider' && isset($_GET['idLider'])) {
+                $datos = $this->modelo->getConsolidadoLider(
+                    (int)$_GET['idLider'],
+                    (int)$periodoActivo['IDPERIODO']
+                );
+                echo json_encode($datos, JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+
+            // ── Flujo 3: consolidado EA P17-P22 + justificaciones para vista previa ─
+            if ($_GET['action'] === 'getConsolidadoEA' && isset($_GET['idEmpleado'])) {
+                $datos = $this->modelo->getConsolidadoEA(
+                    (int)$_GET['idEmpleado'],
+                    $idempleado,
+                    (int)$periodoActivo['IDPERIODO']
+                );
+                echo json_encode($datos, JSON_UNESCAPED_UNICODE);
+                exit();
+            }
+
+            // ── Flujo 3: calificaciones EA (P17-P22) ──────────────────────────
+            if ($_GET['action'] === 'getCalificacionesEA' && isset($_GET['idEmpleado'])) {
+                $calsEA = $this->modelo->getCalificacionesEA(
+                    (int)$_GET['idEmpleado'], $idempleado, $periodoActivo
+                );
+                $autoLegacy  = [];
+                $liderLegacy = [];
+                foreach ($calsEA['auto']  ?? [] as $datos) {
+                    $n = $datos['NUM_PREGUNTA'] ?? 0;
+                    if ($n) $autoLegacy['PREGUNTA' . $n]  = $datos['ETIQUETA'] ?? '';
+                }
+                foreach ($calsEA['lider'] ?? [] as $datos) {
+                    $n = $datos['NUM_PREGUNTA'] ?? 0;
+                    if ($n) $liderLegacy['PREGUNTA' . $n] = $datos['ETIQUETA'] ?? '';
+                }
+                echo json_encode(['auto' => $autoLegacy, 'lider' => $liderLegacy]);
+                exit();
+            }
         }
 
         if ($isAjax && isset($_POST['action'])) {
@@ -185,26 +239,58 @@ class feedbackController extends mainModel {
                     trim($_POST['fechaFeedback'] ?? date('d/m/Y')),
                     trim($_POST['observacion'] ?? '')
                 );
+                if ($resultado['ok'] && ($resultado['esNuevo'] || $resultado['fechaCambio'])) {
+                    $this->modelo->enviarCorreoAgendamiento(
+                        (int)$_POST['idLider'], $idempleado, 'LIDER',
+                        trim($_POST['fechaFeedback'] ?? '')
+                    );
+                }
                 echo json_encode($resultado);
                 exit();
             }
 
-            // POST: registrar feedback
+            // POST: registrar feedback Flujo 1
             if ($_POST['action'] === 'registrarFeedback') {
-                $ok = $this->modelo->registrarFeedback(
+                $resultado = $this->modelo->registrarFeedback(
                     (int)$_POST['idEmpleado'],
                     $idempleado,
                     (int)$periodoActivo['IDPERIODO'],
                     trim($_POST['fechaFeedback'] ?? date('d/m/Y')),
                     trim($_POST['observacion'] ?? '')
                 );
+                if ($resultado['ok'] && ($resultado['esNuevo'] || $resultado['fechaCambio'])) {
+                    $this->modelo->enviarCorreoAgendamiento(
+                        (int)$_POST['idEmpleado'], $idempleado, 'COLAB',
+                        trim($_POST['fechaFeedback'] ?? '')
+                    );
+                }
                 // Obtener el IDFEEDBACK recién creado
                 $acuerdos = $this->modelo->getAcuerdosFeedback(
                     (int)$_POST['idEmpleado'],
                     (int)$periodoActivo['IDPERIODO'],
                     $idempleado
                 );
-                echo json_encode(['ok' => $ok]);
+                echo json_encode(['ok' => $resultado['ok']]);
+                exit();
+            }
+
+            // POST: registrar feedback Flujo 3 (líder → colaborador EA)
+            if ($_POST['action'] === 'registrarFeedbackEA') {
+                $resultadoEA = $this->modelo->registrarFeedback(
+                    (int)$_POST['idEmpleado'],
+                    $idempleado,
+                    (int)$periodoActivo['IDPERIODO'],
+                    trim($_POST['fechaFeedback'] ?? date('d/m/Y')),
+                    trim($_POST['observacion'] ?? ''),
+                    3
+                );
+                if ($resultadoEA['ok'] && ($resultadoEA['esNuevo'] || $resultadoEA['fechaCambio'])) {
+                    $this->modelo->enviarCorreoAgendamiento(
+                        (int)$_POST['idEmpleado'], $idempleado, 'EA',
+                        trim($_POST['fechaFeedback'] ?? '')
+                    );
+                }
+                echo json_encode(['ok' => $resultadoEA['ok']]);
                 exit();
             }
 
@@ -212,7 +298,7 @@ class feedbackController extends mainModel {
             if ($_POST['action'] === 'asignarObjetivo') {
                 // Detectar flujo por NUM_COMPETENCIA
                 $numCompPost = (int)($_POST['numComp'] ?? 0);
-                $flujoPost   = $numCompPost >= 12 ? 2 : 1;
+                $flujoPost   = $numCompPost >= 17 ? 3 : ($numCompPost >= 12 ? 2 : 1);
                 // Verificar máximo según flujo
                 $existentes = $this->modelo->getAcuerdosFeedback(
                     (int)$_POST['idEmpleado'],
@@ -220,8 +306,9 @@ class feedbackController extends mainModel {
                     $idempleado,
                     $flujoPost
                 );
-                if (count($existentes) >= $maxObjetivos) {
-                    echo json_encode(['ok' => false, 'msg' => "Máximo $maxObjetivos objetivos asignados."]);
+                $limiteEste = $maxObjetivos;
+                if (count($existentes) >= $limiteEste) {
+                    echo json_encode(['ok' => false, 'msg' => "Máximo $limiteEste objetivos asignados."]);
                     exit();
                 }
 
@@ -252,6 +339,24 @@ class feedbackController extends mainModel {
                     $_POST['comentario'] ?? ''
                 );
                 echo json_encode(['ok' => $ok]);
+                exit();
+            }
+
+            // POST: firma del colaborador en Flujo 3 (EA)
+            if ($_POST['action'] === 'firmarFeedbackEA') {
+                $idEmpFirmaEA = (int)($_POST['idEmpleado'] ?? 0);
+                $cedulaEA     = trim($_POST['cedula']      ?? '');
+                $passwordEA   = trim($_POST['password']    ?? '');
+                if (!$idEmpFirmaEA || !$cedulaEA || !$passwordEA) {
+                    echo json_encode(['ok' => false, 'msg' => 'Datos incompletos.']);
+                    exit();
+                }
+                $resultado = $this->modelo->firmarFeedbackEA(
+                    $idEmpFirmaEA, $idempleado,
+                    (int)$periodoActivo['IDPERIODO'],
+                    $cedulaEA, $passwordEA
+                );
+                echo json_encode($resultado);
                 exit();
             }
 
@@ -301,8 +406,8 @@ class feedbackController extends mainModel {
             $equipo = $this->modelo->getEquipoConEstado($idempleado, $nivelCargo, $periodoActivo);
         }
 
-        // ── Diccionario de competencias ───────────────────────────────────────
-        $dictComp = \app\models\reportModel::getDictColaborador();
+        // ── Diccionario de competencias (P1-P22, por NUM_PREGUNTA) ────────────
+        $dictComp = \app\models\competenciaModel::getDictAll();
 
         // Flujo 2 — líderes bajo cargo (solo para directores)
         $lideresACargo = [];
@@ -310,16 +415,23 @@ class feedbackController extends mainModel {
             $lideresACargo = $this->modelo->getLideresACargo($idempleado, $periodoActivo);
         }
 
+        // Flujo 3 — colaboradores EA bajo cargo del líder
+        $equipoEA = [];
+        if ($esLider && $periodoActivo) {
+            $equipoEA = $this->modelo->getEquipoEAConEstado($idempleado, $periodoActivo);
+        }
+
         $data = [
-            'periodoActivo' => $periodoActivo,
-            'equipo'        => $equipo,
-            'nivelCargo'    => $nivelCargo,
-            'idempleado'    => $idempleado,
-            'maxObjetivos'  => $maxObjetivos,
-            'dictComp'      => $dictComp,
-            'config'        => $config,
-            'esDirector'    => $esDirector,
-            'lideresACargo' => $lideresACargo,
+            'periodoActivo'   => $periodoActivo,
+            'equipo'          => $equipo,
+            'equipoEA'        => $equipoEA,
+            'nivelCargo'      => $nivelCargo,
+            'idempleado'      => $idempleado,
+            'maxObjetivos'    => $maxObjetivos,
+            'dictComp'        => $dictComp,
+            'config'          => $config,
+            'esDirector'      => $esDirector,
+            'lideresACargo'   => $lideresACargo,
         ];
 
         // Plan de mejora liderazgo — objetivos P12-P16 que el líder recibió

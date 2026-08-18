@@ -19,6 +19,10 @@ class adminModel extends mainModel {
         $res = $this->ejecutarConsulta($sql);
         $row = $res ? oci_fetch_assoc($res) : null;
         if ($res) oci_free_statement($res);
+        if (is_array($row)) {
+            $row['NOMBRE']      = fromOracleEncoding($row['NOMBRE']      ?? '');
+            $row['OBSERVACION'] = fromOracleEncoding($row['OBSERVACION'] ?? '');
+        }
         return $row;
     }
 
@@ -33,7 +37,11 @@ class adminModel extends mainModel {
         $res  = $this->ejecutarConsulta($sql);
         $rows = [];
         if ($res) {
-            while ($r = oci_fetch_assoc($res)) $rows[] = $r;
+            while ($r = oci_fetch_assoc($res)) {
+                $r['NOMBRE']      = fromOracleEncoding($r['NOMBRE']      ?? '');
+                $r['OBSERVACION'] = fromOracleEncoding($r['OBSERVACION'] ?? '');
+                $rows[] = $r;
+            }
             oci_free_statement($res);
         }
         return $rows;
@@ -201,14 +209,14 @@ class adminModel extends mainModel {
                 COUNT(DISTINCT CASE
                     WHEN A.IDEMPLEADO IS NOT NULL
                          AND (E.IDEMPLEADO_EVAL IS NULL OR C.IDEMPLEADO IS NOT NULL)
-                         AND (SUB_E.TOTAL_SUB = 0 OR R_E.TOTAL_REAL >= SUB_E.TOTAL_SUB)
+                         AND (NVL(SUB_E.TOTAL_SUB, 0) = 0 OR R_E.TOTAL_REAL >= SUB_E.TOTAL_SUB)
                     THEN E.IDEMPLEADO END)                                            AS COMPLETOS,
                 ROUND(COUNT(DISTINCT A.IDEMPLEADO) * 100.0
                       / NULLIF(COUNT(DISTINCT E.IDEMPLEADO), 0), 1)                  AS PCT_AUTOEVAL,
                 ROUND(COUNT(DISTINCT CASE
                     WHEN A.IDEMPLEADO IS NOT NULL
                          AND (E.IDEMPLEADO_EVAL IS NULL OR C.IDEMPLEADO IS NOT NULL)
-                         AND (SUB_E.TOTAL_SUB = 0 OR R_E.TOTAL_REAL >= SUB_E.TOTAL_SUB)
+                         AND (NVL(SUB_E.TOTAL_SUB, 0) = 0 OR R_E.TOTAL_REAL >= SUB_E.TOTAL_SUB)
                     THEN E.IDEMPLEADO END) * 100.0
                       / NULLIF(COUNT(DISTINCT E.IDEMPLEADO), 0), 1)                  AS PCT_COMPLETO
             FROM VAADINWEB.HUMEMPLEADOEVAL E
@@ -451,6 +459,14 @@ class adminModel extends mainModel {
                                   $evidencia='', $seguimiento='', $usoRecomendado='') {
         $numComp      = (int)$numComp;
         $calificacion = (int)$calificacion;
+        $objetivo      = $this->toOracle($objetivo);
+        $modelo        = $this->toOracle($modelo);
+        $indicador     = $this->toOracle($indicador);
+        $meta          = $this->toOracle($meta);
+        $plazo         = $this->toOracle($plazo);
+        $evidencia     = $this->toOracle($evidencia);
+        $seguimiento   = $this->toOracle($seguimiento);
+        $usoRecomendado = $this->toOracle($usoRecomendado);
         $sql = "INSERT INTO VAADINWEB.HUMOBJETIVOMEJORA
                     (IDOBJETIVO, NUM_COMPETENCIA, CALIFICACION, OBJETIVO, MODELO,
                      INDICADOR, META, PLAZO, EVIDENCIA, SEGUIMIENTO, USO_RECOMENDADO,
@@ -481,6 +497,14 @@ class adminModel extends mainModel {
                                    $indicador, $meta, $plazo, $evidencia, $seguimiento,
                                    $usoRecomendado) {
         $id = (int)$id; $numComp = (int)$numComp; $calificacion = (int)$calificacion;
+        $objetivo      = $this->toOracle($objetivo);
+        $modelo        = $this->toOracle($modelo);
+        $indicador     = $this->toOracle($indicador);
+        $meta          = $this->toOracle($meta);
+        $plazo         = $this->toOracle($plazo);
+        $evidencia     = $this->toOracle($evidencia);
+        $seguimiento   = $this->toOracle($seguimiento);
+        $usoRecomendado = $this->toOracle($usoRecomendado);
         $sql = "UPDATE VAADINWEB.HUMOBJETIVOMEJORA SET
                     NUM_COMPETENCIA = :nc, CALIFICACION = :cal, OBJETIVO = :obj,
                     MODELO = :mod, INDICADOR = :ind, META = :met, PLAZO = :pla,
@@ -674,7 +698,7 @@ class adminModel extends mainModel {
     public function getLideresEval(): array {
         $sql = "SELECT IDEMPLEADO, NOMBRE, PROCESO
                 FROM VAADINWEB.HUMEMPLEADOEVAL
-                WHERE ES_LIDER_FUNCIONAL = 1 AND ACTIVO = 1
+                WHERE (ES_LIDER_FUNCIONAL = 1 OR IDROL = 3) AND ACTIVO = 1
                 ORDER BY NOMBRE ASC";
         $res  = $this->ejecutarConsulta($sql);
         $rows = [];
@@ -694,7 +718,8 @@ class adminModel extends mainModel {
                                        string $cargo, string $proceso,
                                        string $email, string $celular,
                                        int $idJefe, string $nombreJefe,
-                                       int $esDirector = 0): bool {
+                                       int $esDirector = 0,
+                                       int $esLiderFuncional = 0): bool {
         $conn = $this->conectar();
 
         // Obtener jefe anterior para recalcular ES_LIDER_FUNCIONAL
@@ -709,15 +734,16 @@ class adminModel extends mainModel {
 
         // Actualizar registro principal
         $sql = "UPDATE VAADINWEB.HUMEMPLEADOEVAL SET
-                    IDROL           = :rol,
-                    APLICA_EXP_AZUL = :az,
-                    CARGO           = :cargo,
-                    PROCESO         = :proceso,
-                    EMAIL           = :email,
-                    CELULAR         = :cel,
-                    IDEMPLEADO_EVAL = :jefe,
-                    NOMBRE_JEFE     = :njefe,
-                    ES_DIRECTOR     = :dir
+                    IDROL              = :rol,
+                    APLICA_EXP_AZUL    = :az,
+                    CARGO              = :cargo,
+                    PROCESO            = :proceso,
+                    EMAIL              = :email,
+                    CELULAR            = :cel,
+                    IDEMPLEADO_EVAL    = :jefe,
+                    NOMBRE_JEFE        = :njefe,
+                    ES_DIRECTOR        = :dir,
+                    ES_LIDER_FUNCIONAL = :lf
                 WHERE IDASIGNACION = :id";
         $q = oci_parse($conn, $sql);
         $cargo      = $this->toOracle($cargo);
@@ -734,6 +760,7 @@ class adminModel extends mainModel {
         oci_bind_by_name($q, ':jefe',  $idJefe);
         oci_bind_by_name($q, ':njefe', $nombreJefe, 200);
         oci_bind_by_name($q, ':dir',   $esDirector);
+        oci_bind_by_name($q, ':lf',    $esLiderFuncional);
         oci_bind_by_name($q, ':id',    $id);
         $ok = oci_execute($q, OCI_NO_AUTO_COMMIT);
         oci_free_statement($q);
@@ -833,8 +860,8 @@ class adminModel extends mainModel {
     /** Edita nombre y pregunta de una competencia */
     public function editarCompetencia(int $id, string $nombre, string $pregunta): bool {
         $idC  = $id;
-        $nom  = $nombre;
-        $preg = $pregunta;
+        $nom  = $this->toOracle($nombre);
+        $preg = $this->toOracle($pregunta);
         $sql  = "UPDATE VAADINWEB.HUMCOMPETENCIA SET NOMBRE = :nom, PREGUNTA = :preg WHERE IDCOMPETENCIA = :id";
         $conn = $this->conectar();
         $q    = oci_parse($conn, $sql);
@@ -887,7 +914,7 @@ class adminModel extends mainModel {
     /** Edita la descripción de una opción de competencia */
     public function editarOpcionCompetencia(int $idOpcionComp, string $descripcion): bool {
         $id  = $idOpcionComp;
-        $txt = $descripcion;
+        $txt = $this->toOracle($descripcion);
         $sql = "UPDATE VAADINWEB.HUMOPCIONCOMPETENCIA SET DESCRIPCION = :txt WHERE IDOPCIONCOMP = :id";
         $conn = $this->conectar();
         $q    = oci_parse($conn, $sql);
@@ -956,6 +983,36 @@ class adminModel extends mainModel {
         oci_bind_by_name($query, ':valor', $valor);
         $ok = oci_execute($query, OCI_COMMIT_ON_SUCCESS);
         oci_free_statement($query);
+        return $ok;
+    }
+
+    /** Lee un parámetro de HUMCONFIGMEJORA. Devuelve $default si no existe. */
+    public function getConfigParam(string $parametro, string $default = ''): string {
+        $par = addslashes($parametro);
+        $sql = "SELECT VALOR FROM VAADINWEB.HUMCONFIGMEJORA
+                WHERE PARAMETRO = '$par' AND ACTIVO = 1 AND ROWNUM = 1";
+        $res = $this->ejecutarConsulta($sql);
+        $row = $res ? oci_fetch_assoc($res) : null;
+        if ($res) oci_free_statement($res);
+        return $row ? (string)($row['VALOR'] ?? $default) : $default;
+    }
+
+    /** Actualiza o inserta un parámetro en HUMCONFIGMEJORA (UPSERT). */
+    public function setConfigParam(string $parametro, string $valor): bool {
+        $conn = $this->conectar();
+        $sql  = "BEGIN
+                   UPDATE VAADINWEB.HUMCONFIGMEJORA SET VALOR = :val
+                   WHERE PARAMETRO = :par AND ACTIVO = 1;
+                   IF SQL%ROWCOUNT = 0 THEN
+                     INSERT INTO VAADINWEB.HUMCONFIGMEJORA (PARAMETRO, VALOR, ACTIVO)
+                     VALUES (:par, :val, 1);
+                   END IF;
+                 END;";
+        $q = oci_parse($conn, $sql);
+        oci_bind_by_name($q, ':par', $parametro);
+        oci_bind_by_name($q, ':val', $valor);
+        $ok = oci_execute($q, OCI_COMMIT_ON_SUCCESS);
+        oci_free_statement($q);
         return $ok;
     }
 

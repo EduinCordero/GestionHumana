@@ -85,6 +85,7 @@ class analiticaController extends mainModel {
         $evolucion          = [];
         $ranking            = [];
         $topColaboradores   = [];
+        $bottomColaboradores = [];
         $resumenProcesos    = [];
         $acuerdos           = [];
         $totalAcuerdos      = 0;
@@ -94,6 +95,7 @@ class analiticaController extends mainModel {
         $procesosLista      = [];
         $brechas            = [];
         $expAzul            = ['kpi' => [], 'competencias' => [], 'pendientes' => [], 'evaluados' => []];
+        $resumenFeedback    = ['kpis' => [], 'porLider' => []];
 
         switch ($activeTab) {
             case 'dashboard':
@@ -102,8 +104,9 @@ class analiticaController extends mainModel {
                 $resumenProcesos = $this->modelo->getResumenPorProceso($periodoActivo);
                 break;
             case 'ranking':
-                $ranking          = $this->modelo->getRankingCompetencias($periodoActivo, $proceso, $tipoEval);
-                $topColaboradores = $this->modelo->getTopColaboradores($periodoActivo, $tipoEval, $proceso, 10);
+                $ranking             = $this->modelo->getRankingCompetencias($periodoActivo, $proceso, $tipoEval);
+                $topColaboradores    = $this->modelo->getTopColaboradores($periodoActivo, $tipoEval, $proceso, 10, 'DESC');
+                $bottomColaboradores = $this->modelo->getTopColaboradores($periodoActivo, $tipoEval, $proceso, 10, 'ASC');
                 break;
             case 'historico':
                 $evolucion = $this->modelo->getEvolucionHistorica(12);
@@ -129,6 +132,9 @@ class analiticaController extends mainModel {
                 break;
             case 'exp_azul':
                 $expAzul = $this->modelo->getResumenExpAzul($periodoActivo);
+                break;
+            case 'feedback':
+                $resumenFeedback = $this->modelo->getResumenFeedback($periodoActivo);
                 break;
         }
 

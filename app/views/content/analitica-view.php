@@ -23,7 +23,9 @@ $filtrosColab       = $filtrosColab       ?? ['nombre' => '', 'proceso' => '', '
 $procesosLista      = $procesosLista      ?? [];
 $brechas            = $brechas            ?? [];
 $expAzul            = $expAzul            ?? ['kpi' => [], 'competencias' => [], 'pendientes' => [], 'evaluados' => []];
-$topColaboradores   = $topColaboradores   ?? [];
+$resumenFeedback    = $resumenFeedback    ?? ['kpis' => [], 'porLider' => []];
+$topColaboradores    = $topColaboradores    ?? [];
+$bottomColaboradores = $bottomColaboradores ?? [];
 
 $_tabUrl = function(string $tab) use ($periodoActivo, $idPeriodoFiltro): string {
     $p = $idPeriodoFiltro ?: ($periodoActivo['IDPERIODO'] ?? 0);
@@ -446,6 +448,7 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
 /* ── V2: Exp Azul badges ── */
 .an-badge.ea-ok      { background: #dbeafe; color: #1d4ed8; }
 .an-badge.ea-pending { background: #fef3c7; color: #92400e; }
+.an-badge.ea-na      { background: #f1f5f9; color: #94a3b8; letter-spacing:.03em; }
 
 /* ── V2: Colaboradores chip filters ── */
 .an-chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
@@ -631,9 +634,9 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
             ['id'=>'brechas',       'icon'=>'ti-git-compare',      'label'=>'Brechas'],
             ['id'=>'historico',     'icon'=>'ti-timeline',         'label'=>'Histórico'],
             ['id'=>'acuerdos',      'icon'=>'ti-clipboard-list',   'label'=>'Acuerdos'],
-            ['id'=>'procesos',      'icon'=>'ti-building',         'label'=>'Procesos'],
             ['id'=>'exp_azul',      'icon'=>'ti-droplet',          'label'=>'Exp. Azul'],
             ['id'=>'alertas',       'icon'=>'ti-alert-triangle',   'label'=>'Alertas'],
+            ['id'=>'feedback',      'icon'=>'ti-message-check',    'label'=>'Feedback'],
         ];
         foreach ($tabs as $t): ?>
         <a href="<?= $_tabUrl($t['id']) ?>" class="an-tab <?= $activeTab === $t['id'] ? 'active' : '' ?>">
@@ -1048,6 +1051,42 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
                 <?php endif; ?>
                 <?php if ((int)($tc['APRO_AC'] ?? 0) > 0): ?>
                 <span style="color:#15803d"><b><?= (int)$tc['APRO_AC'] ?></b> apro.</span>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($bottomColaboradores)): ?>
+    <div class="an-card" style="margin-bottom:16px;">
+        <div class="an-card-head">
+            <h3 class="an-card-title"><i class="ti ti-trending-down" style="color:#dc2626"></i> Oportunidades de mejora — Promedios más bajos</h3>
+            <span style="font-size:.72rem;color:var(--an-muted)">Colaboradores con mayor necesidad de acompañamiento</span>
+        </div>
+        <div class="an-top-grid">
+        <?php foreach ($bottomColaboradores as $i => $bc):
+            $prom    = (float)($bc['PROMEDIO'] ?? 0);
+            $promCls = $prom >= 4 ? 'green' : ($prom >= 3 ? 'blue' : ($prom >= 2 ? 'warn' : 'danger'));
+            $initials= implode('', array_map(fn($w) => mb_strtoupper(mb_substr($w,0,1)), array_slice(explode(' ', $bc['NOMBRE'] ?? 'N'), 0, 2)));
+        ?>
+        <div class="an-top-card" onclick="anOpenRankPerfil(<?= (int)$bc['IDEMPLEADO'] ?>)"
+             style="border-top:3px solid <?= $prom < 2 ? '#dc2626' : ($prom < 3 ? '#f59e0b' : '#3b82f6') ?>">
+            <div class="an-top-rank" style="background:#fee2e2;color:#dc2626"><?= $i + 1 ?></div>
+            <div class="an-top-avatar" style="background:linear-gradient(135deg,#fee2e2,#fecaca);color:#dc2626">
+                <span style="font-weight:800;font-size:.95rem"><?= htmlspecialchars($initials, ENT_QUOTES) ?></span>
+            </div>
+            <div class="an-top-name"><?= htmlspecialchars($bc['NOMBRE'] ?? '', ENT_QUOTES) ?></div>
+            <div class="an-top-cargo" title="<?= htmlspecialchars($bc['CARGO'] ?? '', ENT_QUOTES) ?>"><?= htmlspecialchars(mb_strimwidth($bc['CARGO'] ?? '', 0, 28, '…'), ENT_QUOTES) ?></div>
+            <div class="an-top-score" style="color:#dc2626"><?= number_format($prom, 2) ?><span> / 5</span></div>
+            <div class="an-top-stats">
+                <span><i class="ti ti-clipboard-list" style="font-size:.72rem"></i> <b><?= (int)($bc['TOTAL_AC'] ?? 0) ?></b> ac.</span>
+                <?php if ((int)($bc['PEND_AC'] ?? 0) > 0): ?>
+                <span style="color:#92400e"><b><?= (int)$bc['PEND_AC'] ?></b> pend.</span>
+                <?php endif; ?>
+                <?php if ((int)($bc['APRO_AC'] ?? 0) > 0): ?>
+                <span style="color:#15803d"><b><?= (int)$bc['APRO_AC'] ?></b> apro.</span>
                 <?php endif; ?>
             </div>
         </div>
@@ -2026,7 +2065,7 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
             <div class="an-kpi-icon"><i class="ti ti-arrow-up-right"></i></div>
             <div class="an-kpi-value"><?= (float)($eaKpi['PCT_COLAB'] ?? 0) ?>%</div>
             <div class="an-kpi-label">Completaron (Colab → Líder)</div>
-            <div class="an-kpi-sub"><?= (int)($eaKpi['COMPLETARON_COLAB'] ?? 0) ?> colaboradores</div>
+            <div class="an-kpi-sub"><?= (int)($eaKpi['COMPLETARON_COLAB'] ?? 0) ?> de <?= (int)($eaKpi['TOTAL_APLICA_COLAB'] ?? 0) ?> aplican</div>
         </div>
         <div class="an-kpi warn">
             <div class="an-kpi-icon"><i class="ti ti-arrow-down-right"></i></div>
@@ -2062,7 +2101,7 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
                     <?php foreach ($eaComp as $ec):
                         $epv = (float)($ec['PROMEDIO'] ?? 0);
                         $epCls = $epv >= 4 ? 's-hi' : ($epv >= 3 ? 's-mid' : ($epv >= 2 ? 's-low' : 's-bad'));
-                        $tipo  = $ec['TIPO_EVAL'] === 'EXPERIENCIA_COLAB' ? 'Colab → Líder' : 'Líder → Colab';
+                        $tipo  = $ec['TIPO_EVAL'] === 'EXPERIENCIA_COLAB' ? 'Líder → Colab' : 'Colab → Líder';
                     ?>
                     <tr>
                         <td><?= $ec['NUM_PREGUNTA'] ?? '' ?></td>
@@ -2108,7 +2147,7 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
                         <td class="bold"><?= htmlspecialchars($ep['COLABORADOR'] ?? '', ENT_QUOTES) ?></td>
                         <td><?= htmlspecialchars($ep['PROCESO'] ?? '', ENT_QUOTES) ?></td>
                         <td><?= htmlspecialchars($ep['LIDER'] ?? '—', ENT_QUOTES) ?></td>
-                        <td><?php if ((int)($ep['HIZO_COLAB'] ?? 0)): ?><span class="an-badge completo">Listo</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
+                        <td><?php $hc = (int)($ep['HIZO_COLAB'] ?? 0); if ($hc === 2): ?><span class="an-badge ea-na">N/A</span><?php elseif ($hc): ?><span class="an-badge completo">Listo</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
                         <td><?php if ((int)($ep['HIZO_LIDER'] ?? 0)): ?><span class="an-badge completo">Listo</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
                     </tr>
                     <?php endforeach; ?>
@@ -2204,7 +2243,7 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
                     <td><?= htmlspecialchars($ev['CARGO'] ?? '', ENT_QUOTES) ?></td>
                     <td><?= htmlspecialchars($ev['PROCESO'] ?? '', ENT_QUOTES) ?></td>
                     <td><?= htmlspecialchars($ev['LIDER'] ?? '—', ENT_QUOTES) ?></td>
-                    <td><?php if ((int)($ev['HIZO_COLAB'] ?? 0)): ?><span class="an-badge completo">Completó</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
+                    <td><?php $hc = (int)($ev['HIZO_COLAB'] ?? 0); if ($hc === 2): ?><span class="an-badge ea-na">N/A</span><?php elseif ($hc): ?><span class="an-badge completo">Completó</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
                     <td><?php if ((int)($ev['HIZO_LIDER'] ?? 0)): ?><span class="an-badge completo">Completó</span><?php else: ?><span class="an-badge ea-pending">Pendiente</span><?php endif; ?></td>
                     <td class="num"><span class="an-score <?= $sC ?>"><?= $pcL > 0 ? number_format($pcL,2) : '—' ?></span></td>
                     <td class="num"><span class="an-score <?= $sL2 ?>"><?= $plL > 0 ? number_format($plL,2) : '—' ?></span></td>
@@ -2215,6 +2254,173 @@ $_periodoLabel = $periodoActivo ? htmlspecialchars($periodoActivo['NOMBRE'] ?? '
         </div>
     </div>
     <?php endif; ?>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!-- TAB: SEGUIMIENTO FEEDBACK -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <?php elseif ($activeTab === 'feedback'):
+    $fbKpis    = $resumenFeedback['kpis']    ?? [];
+    $fbLideres = $resumenFeedback['porLider'] ?? [];
+
+    $fl1T  = (int)($fbKpis['FL1_TOTAL']     ?? 0);
+    $fl1F  = (int)($fbKpis['FL1_FIRMADOS']  ?? 0);
+    $fl2T  = (int)($fbKpis['FL2_TOTAL']     ?? 0);
+    $fl2F  = (int)($fbKpis['FL2_FIRMADOS']  ?? 0);
+    $fl3T  = (int)($fbKpis['FL3_TOTAL']     ?? 0);
+    $fl3F  = (int)($fbKpis['FL3_FIRMADOS']  ?? 0);
+    $smT   = (int)($fbKpis['SMART_TOTAL']   ?? 0);
+    $smA   = (int)($fbKpis['SMART_APROBADOS'] ?? 0);
+
+    $pctFl1 = $fl1T ? round($fl1F / $fl1T * 100) : 0;
+    $pctFl2 = $fl2T ? round($fl2F / $fl2T * 100) : 0;
+    $pctFl3 = $fl3T ? round($fl3F / $fl3T * 100) : 0;
+    $pctSm  = $smT  ? round($smA  / $smT  * 100) : 0;
+    ?>
+
+    <!-- KPIs globales -->
+    <div class="an-kpi-grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));margin-bottom:22px;">
+        <div class="an-kpi blue">
+            <div class="an-kpi-icon"><i class="ti ti-message-check"></i></div>
+            <div class="an-kpi-value"><?= $fl1T ?></div>
+            <div class="an-kpi-label">Desempeño registrado</div>
+            <div class="an-kpi-sub"><?= $fl1F ?> firmados · <?= $pctFl1 ?>%</div>
+        </div>
+        <div class="an-kpi" style="border-top-color:#7c3aed">
+            <div class="an-kpi-icon" style="background:#ede9fe;color:#7c3aed"><i class="ti ti-shield-check"></i></div>
+            <div class="an-kpi-value"><?= $fl2T ?></div>
+            <div class="an-kpi-label">Liderazgo registrado</div>
+            <div class="an-kpi-sub"><?= $fl2F ?> firmados · <?= $pctFl2 ?>%</div>
+        </div>
+        <div class="an-kpi" style="border-top-color:#0891b2">
+            <div class="an-kpi-icon" style="background:#cffafe;color:#0891b2"><i class="ti ti-droplet-check"></i></div>
+            <div class="an-kpi-value"><?= $fl3T ?></div>
+            <div class="an-kpi-label">Exp. Azul registrado</div>
+            <div class="an-kpi-sub"><?= $fl3F ?> firmados · <?= $pctFl3 ?>%</div>
+        </div>
+        <div class="an-kpi green">
+            <div class="an-kpi-icon"><i class="ti ti-target"></i></div>
+            <div class="an-kpi-value"><?= $smT ?></div>
+            <div class="an-kpi-label">Objetivos SMART</div>
+            <div class="an-kpi-sub"><?= $smA ?> aprobados · <?= $pctSm ?>%</div>
+        </div>
+    </div>
+
+    <!-- Tabla por líder -->
+    <div class="an-card">
+        <div class="an-card-head">
+            <h3 class="an-card-title"><i class="ti ti-users-group"></i> Avance por líder</h3>
+            <span style="font-size:.75rem;color:var(--an-muted);"><?= count($fbLideres) ?> líderes activos</span>
+        </div>
+        <div class="an-table-wrap">
+            <table class="an-table">
+                <thead>
+                    <tr>
+                        <th>Líder</th>
+                        <th>Área / Proceso</th>
+                        <th style="text-align:center;">Equipo</th>
+                        <th style="text-align:center;">Desempeño</th>
+                        <th style="text-align:center;">Liderazgo</th>
+                        <th style="text-align:center;">Exp. Azul</th>
+                        <th style="text-align:center;">SMART asig.</th>
+                        <th style="text-align:center;">SMART apro.</th>
+                        <th style="text-align:center;">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($fbLideres)): ?>
+                <tr><td colspan="9" style="text-align:center;color:var(--an-muted);padding:32px;">Sin datos para este período</td></tr>
+                <?php endif; ?>
+                <?php foreach ($fbLideres as $ldr):
+                    $tc     = (int)($ldr['TOTAL_COLAB']     ?? 0);
+                    $fl1fb  = (int)($ldr['FL1_FEEDBACK']    ?? 0);
+                    $fl1fm  = (int)($ldr['FL1_FIRMADOS']    ?? 0);
+                    $fl2fb  = (int)($ldr['FL2_FEEDBACK']    ?? 0);
+                    $fl2fm  = (int)($ldr['FL2_FIRMADOS']    ?? 0);
+                    $fl3fb  = (int)($ldr['FL3_FEEDBACK']    ?? 0);
+                    $fl3fm  = (int)($ldr['FL3_FIRMADOS']    ?? 0);
+                    $cfl2   = (int)($ldr['COLABS_FL2']      ?? 0);
+                    $cfl3   = (int)($ldr['COLABS_FL3']      ?? 0);
+                    $smt    = (int)($ldr['SMART_TOTAL']     ?? 0);
+                    $sma    = (int)($ldr['SMART_APROBADOS'] ?? 0);
+                    $nafl2  = $cfl2 === 0;
+                    $nafl3  = $cfl3 === 0;
+
+                    $pct1 = $tc   > 0 ? round($fl1fm / $tc   * 100) : 0;
+                    $pct2 = $cfl2 > 0 ? round($fl2fm / $cfl2 * 100) : 0;
+                    $pct3 = $cfl3 > 0 ? round($fl3fm / $cfl3 * 100) : 0;
+
+                    $fl1done = ($fl1fm >= $tc   && $tc   > 0);
+                    $fl2done = $nafl2 || ($fl2fm >= $cfl2 && $cfl2 > 0);
+                    $fl3done = $nafl3 || ($fl3fm >= $cfl3 && $cfl3 > 0);
+
+                    if ($fl1done && $fl2done && $fl3done) {
+                        $est = ['bg'=>'#dcfce7','c'=>'#15803d','ic'=>'circle-check','lbl'=>'Completo'];
+                    } elseif ($fl1fb > 0 || $fl2fb > 0 || $fl3fb > 0) {
+                        $est = ['bg'=>'#fef3c7','c'=>'#92400e','ic'=>'clock',        'lbl'=>'En curso'];
+                    } else {
+                        $est = ['bg'=>'#fee2e2','c'=>'#991b1b','ic'=>'x-circle',     'lbl'=>'Sin iniciar'];
+                    }
+                ?>
+                <tr>
+                    <td class="bold"><?= htmlspecialchars($ldr['NOMBRE'] ?? '', ENT_QUOTES) ?></td>
+                    <td style="font-size:.78rem;color:var(--an-muted);"><?= htmlspecialchars($ldr['PROCESO'] ?? '—', ENT_QUOTES) ?></td>
+                    <td class="num"><?= $tc ?></td>
+                    <!-- Desempeño (FL1 — siempre aplica) -->
+                    <td style="text-align:center;white-space:nowrap;">
+                        <div style="font-size:.78rem;">
+                            <span style="font-weight:700;color:var(--an-primary);"><?= $fl1fb ?></span><span style="color:var(--an-muted);font-size:.7rem;"> fb · </span><span style="font-weight:700;color:<?= $fl1fm > 0 ? '#15803d' : '#94a3b8' ?>;"><?= $fl1fm ?></span><span style="color:var(--an-muted);font-size:.7rem;"> firm</span>
+                        </div>
+                        <?php if ($tc > 0): ?>
+                        <div style="margin-top:3px;height:3px;width:46px;display:inline-block;background:#e2e8f0;border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;width:<?= $pct1 ?>%;background:<?= $pct1 >= 100 ? '#16a34a' : '#0058af' ?>;border-radius:2px;"></div>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                    <!-- Liderazgo (FL2) -->
+                    <td style="text-align:center;white-space:nowrap;">
+                        <?php if ($nafl2): ?>
+                        <span class="an-badge ea-na">N/A</span>
+                        <?php else: ?>
+                        <div style="font-size:.78rem;">
+                            <span style="font-weight:700;color:#7c3aed;"><?= $fl2fb ?></span><span style="color:var(--an-muted);font-size:.7rem;"> fb · </span><span style="font-weight:700;color:<?= $fl2fm > 0 ? '#15803d' : '#94a3b8' ?>;"><?= $fl2fm ?></span><span style="color:var(--an-muted);font-size:.7rem;"> firm</span>
+                        </div>
+                        <?php if ($cfl2 > 0): ?>
+                        <div style="margin-top:3px;height:3px;width:46px;display:inline-block;background:#e2e8f0;border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;width:<?= $pct2 ?>%;background:<?= $pct2 >= 100 ? '#16a34a' : '#7c3aed' ?>;border-radius:2px;"></div>
+                        </div>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </td>
+                    <!-- Exp. Azul (FL3) -->
+                    <td style="text-align:center;white-space:nowrap;">
+                        <?php if ($nafl3): ?>
+                        <span class="an-badge ea-na">N/A</span>
+                        <?php else: ?>
+                        <div style="font-size:.78rem;">
+                            <span style="font-weight:700;color:#0891b2;"><?= $fl3fb ?></span><span style="color:var(--an-muted);font-size:.7rem;"> fb · </span><span style="font-weight:700;color:<?= $fl3fm > 0 ? '#15803d' : '#94a3b8' ?>;"><?= $fl3fm ?></span><span style="color:var(--an-muted);font-size:.7rem;"> firm</span>
+                        </div>
+                        <?php if ($cfl3 > 0): ?>
+                        <div style="margin-top:3px;height:3px;width:46px;display:inline-block;background:#e2e8f0;border-radius:2px;overflow:hidden;">
+                            <div style="height:100%;width:<?= $pct3 ?>%;background:<?= $pct3 >= 100 ? '#16a34a' : '#0891b2' ?>;border-radius:2px;"></div>
+                        </div>
+                        <?php endif; ?>
+                        <?php endif; ?>
+                    </td>
+                    <td class="num"><?= $smt > 0 ? $smt : '<span style="color:#94a3b8;">—</span>' ?></td>
+                    <td class="num"><?= $sma > 0 ? '<span style="color:#16a34a;font-weight:700;">' . $sma . '</span>' : '<span style="color:#94a3b8;">—</span>' ?></td>
+                    <td style="text-align:center;">
+                        <span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+                                     border-radius:20px;font-size:.72rem;font-weight:700;
+                                     background:<?= $est['bg'] ?>;color:<?= $est['c'] ?>;">
+                            <i class="ti ti-<?= $est['ic'] ?>" style="font-size:11px;"></i> <?= $est['lbl'] ?>
+                        </span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <?php endif; ?>
 

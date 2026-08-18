@@ -79,6 +79,7 @@ class adminController extends mainModel {
         $estadoEquipo       = [];
         $resumenEquipo      = ['total' => 0, 'completo' => 0, 'en_progreso' => 0, 'sin_iniciar' => 0];
         $feedbackActivo     = false;
+        $maxObjetivos       = 3;
 
         // Siempre necesario — usado por POST handlers y la vista
         $periodoActivo = $this->modelo->getPeriodoActivo();
@@ -147,6 +148,18 @@ class adminController extends mainModel {
                 exit();
             }
 
+            // EDITAR MÁXIMO DE OBJETIVOS SMART (aplica a los 3 flujos)
+            if ($_POST['action'] === 'setMaxObjetivos') {
+                $val = max(1, min(10, (int)($_POST['valor'] ?? 3)));
+                $ok  = $this->modelo->setConfigParam('MAX_OBJETIVOS', (string)$val);
+                if ($ok) {
+                    $_SESSION['admin_ok'] = "Límite de objetivos SMART actualizado a $val por colaborador/líder.";
+                } else {
+                    $_SESSION['admin_error'] = 'Error al actualizar el límite de objetivos.';
+                }
+                echo "<script>window.location.href='" . APP_URL . "admin/?tab=periodos';</script>"; exit();
+            }
+
             // TOGGLE MÓDULO FEEDBACK (habilitar / deshabilitar)
             if ($_POST['action'] === 'toggleFeedbackActivo') {
                 $nuevoValor = (int)($_POST['valor'] ?? 0);
@@ -188,15 +201,16 @@ class adminController extends mainModel {
             if ($_POST['action'] === 'editarEmpleadoEval' && isset($_POST['idAsignacion'])) {
                 $ok = $this->modelo->editarEmpleadoEval(
                     (int)$_POST['idAsignacion'],
-                    (int)($_POST['idRol']          ?? 2),
-                    (int)($_POST['aplicaExpAzul']  ?? 0),
-                    trim($_POST['cargo']       ?? ''),
-                    trim($_POST['proceso']     ?? ''),
-                    trim($_POST['email']       ?? ''),
-                    trim($_POST['celular']     ?? ''),
-                    (int)($_POST['idJefe']     ?? 0),
-                    trim($_POST['nombreJefe']  ?? ''),
-                    (int)($_POST['esDirector'] ?? 0)
+                    (int)($_POST['idRol']              ?? 2),
+                    (int)($_POST['aplicaExpAzul']      ?? 0),
+                    trim($_POST['cargo']           ?? ''),
+                    trim($_POST['proceso']         ?? ''),
+                    trim($_POST['email']           ?? ''),
+                    trim($_POST['celular']         ?? ''),
+                    (int)($_POST['idJefe']         ?? 0),
+                    trim($_POST['nombreJefe']      ?? ''),
+                    (int)($_POST['esDirector']     ?? 0),
+                    (int)($_POST['esLiderFuncional'] ?? 0)
                 );
                 $_SESSION['admin_ok']    = $ok ? 'Registro actualizado.' : '';
                 $_SESSION['admin_error'] = $ok ? '' : 'Error al actualizar.';
@@ -491,6 +505,7 @@ class adminController extends mainModel {
             case 'periodos':
                 $periodos       = $this->modelo->getPeriodos();
                 $feedbackActivo = $this->modelo->getFeedbackActivo();
+                $maxObjetivos   = (int)$this->modelo->getConfigParam('MAX_OBJETIVOS', '3');
                 break;
 
             case 'seguimiento':
@@ -556,6 +571,7 @@ class adminController extends mainModel {
             'notifMasiva_total'  => $notifMasiva_total,
             'notifSinCorreo'     => $notifSinCorreo ?? [],
             'feedbackActivo'     => $feedbackActivo,
+            'maxObjetivos'       => $maxObjetivos,
             'dictColab'          => $dictColab,
             'objetivos'          => $objetivos,
             'empleadosEval'      => $empleadosEval,

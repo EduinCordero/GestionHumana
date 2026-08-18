@@ -23,14 +23,13 @@ $idEvaluado  = $tipoEval === 'AUTO'
     : (int)($_SESSION['idEvaluado'] ?? $idEvaluador);
 
 // ── Período activo ────────────────────────────────────────────────────────────
-$sqlPer = "SELECT IDPERIODO, NOMBRE FROM VAADINWEB.HUMPERIODOEVALUACION
-           WHERE ESTADO = 1
-             AND TRUNC(SYSDATE) BETWEEN TRUNC(FECHAAPERTURA) AND TRUNC(FECHACIERRE)
-             AND ROWNUM = 1";
-$resPer  = (new \app\models\mainModel)->ejecutarConsulta($sqlPer);
-$periodo = $resPer ? oci_fetch_assoc($resPer) : null;
+$periodo = $compModelo->getPeriodoActivo();
 if (!$periodo) {
-    echo "<script>sessionStorage.setItem('sinPeriodo','1');window.location.href='" . APP_URL . "home/';</script>";
+    $urlHome = APP_URL . "home/";
+    echo "<script>sessionStorage.setItem('sinPeriodo','1');
+          (function(){ if(document.readyState==='loading'){
+              document.addEventListener('DOMContentLoaded',function(){ window.location.replace('$urlHome'); });
+          } else { window.location.replace('$urlHome'); } })();</script>";
     exit;
 }
 $idPeriodo = (int)$periodo['IDPERIODO'];
@@ -157,13 +156,39 @@ $extremosPorEscala = [
         </div>
     </div>
 
-    <!-- Progreso -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span class="ev-step" id="ev-step">Pregunta 1 de <?= $totalPregs ?></span>
-        <span style="font-size:.78rem;color:var(--ev-muted);" id="ev-pct">0%</span>
+    <!-- Progreso (oculto durante la introducción) -->
+    <div id="ev-progress-header" style="display:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span class="ev-step" id="ev-step">Pregunta 1 de <?= $totalPregs ?></span>
+            <span style="font-size:.78rem;color:var(--ev-muted);" id="ev-pct">0%</span>
+        </div>
+        <div class="ev-progress-wrap">
+            <div class="ev-progress-bar" id="ev-progress" style="width:0%"></div>
+        </div>
     </div>
-    <div class="ev-progress-wrap">
-        <div class="ev-progress-bar" id="ev-progress" style="width:0%"></div>
+
+    <?php
+    $introTitulo = $tipoEval === 'COLAB_A_LIDER'
+        ? 'Orientación — Evaluación de Liderazgo'
+        : 'Orientación antes de comenzar';
+    $introTexto  = $tipoEval === 'COLAB_A_LIDER'
+        ? 'En esta sección evalúa comportamientos observables de liderazgo vividos durante el periodo evaluado. Evita responder por simpatía personal o por un hecho aislado; piensa en la forma habitual en que tu líder orienta, acompaña, comunica y cuida al equipo.'
+        : 'Evalúa los comportamientos observados durante el periodo evaluado Junio de 2025 a junio de 2026, teniendo en cuenta las responsabilidades del cargo, el contexto del servicio y las situaciones reales del día a día. Evita calificar con base en simpatías personales, hechos aislados o percepciones sin evidencia.';
+    ?>
+    <div class="ev-section active" id="ev-intro">
+        <div style="background:#f0f6ff;border-radius:12px;border-left:4px solid var(--ev-accent);padding:22px 24px;margin-bottom:28px;">
+            <div style="font-size:.75rem;font-weight:800;color:var(--ev-accent);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;display:flex;align-items:center;gap:6px;">
+                <?= icon('info-circle', 14) ?> <?= htmlspecialchars($introTitulo) ?>
+            </div>
+            <p style="font-size:.9rem;color:var(--ev-text);line-height:1.75;margin:0;">
+                <?= htmlspecialchars($introTexto) ?>
+            </p>
+        </div>
+        <div style="display:flex;justify-content:flex-end;">
+            <button type="button" class="ev-btn ev-btn-primary" style="padding:12px 28px;font-size:.92rem;" onclick="evStartEval()">
+                <?= icon('play-circle', 15) ?> Comenzar evaluación
+            </button>
+        </div>
     </div>
 
     <!-- Formulario dinámico -->
@@ -187,7 +212,7 @@ $extremosPorEscala = [
             $opciones    = $compModelo->getOpcionesPorCompetencia($idComp);
             $extremos    = $extremosPorEscala[$idEscala] ?? ['Sobresaliente', 'Insuficiente'];
             $esUltima    = ($idx === $totalPregs - 1);
-            $esActiva    = $idx === 0 ? ' active' : '';
+            $esActiva    = '';
         ?>
 
         <div class="ev-section<?= $esActiva ?>" id="ev-section-<?= $numSec ?>">
@@ -385,6 +410,14 @@ function evPrev(current) {
     document.getElementById('ev-section-' + (current - 1)).classList.add('active');
     evUpdateProgress(current - 1, <?= $totalPregs ?> + 1);
     window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function evStartEval() {
+    document.getElementById('ev-intro').classList.remove('active');
+    document.getElementById('ev-progress-header').style.display = '';
+    document.getElementById('ev-section-1').classList.add('active');
+    evUpdateProgress(1, <?= $totalPregs ?> + 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function evPrevFromConfirm(total) {

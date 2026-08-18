@@ -15,6 +15,16 @@ foreach ($mapPreg as $local => $real) {
         $tooltipLider[$local] = $tooltipDesc[$real];
     }
 }
+
+// Cargar NOMBRE y PREGUNTA dinámicamente desde BD (reflejan ediciones del admin)
+$compDataLider = [];
+foreach ($compModeloTooltip->getCompetencias() as $comp) {
+    if ($comp['NUM_PREGUNTA'] >= 12 && $comp['NUM_PREGUNTA'] <= 16) {
+        $compDataLider[$comp['NUM_PREGUNTA']] = $comp;
+    }
+}
+ksort($compDataLider);
+$compDataLider = array_values($compDataLider); // índice 0-4 → NUM_PREGUNTA 12-16
 ?>
 
 <style>
@@ -368,9 +378,19 @@ foreach ($mapPreg as $local => $real) {
                 box-shadow:0 24px 64px rgba(0,0,0,.25);animation:evModalIn .3s ease;text-align:center;">
         <div style="font-size:2.4rem;margin-bottom:14px;"><i class="ti ti-building-hospital" style="color:#0058af;"></i></div>
         <div style="font-size:1.05rem;font-weight:800;color:#1e3a5f;margin-bottom:14px;">Evaluación de Liderazgo V2 2026</div>
-        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:28px;text-align:center;
+        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:16px;text-align:center;
                     background:#f8fafc;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;">
             En la Clínica Zayma, creemos que cada acción cuenta y cada colaborador es pieza clave en nuestra misión de servir con excelencia y calidez humana. Esta evaluación es una oportunidad para reflexionar sobre el liderazgo de tu líder con sinceridad y entusiasmo, porque cada aporte nos lleva más cerca de construir el futuro que soñamos como equipo.
+        </div>
+        <div style="font-size:.88rem;color:#1e3a5f;line-height:1.8;margin-bottom:28px;text-align:center;
+                    background:linear-gradient(135deg,#dbeafe,#eff6ff);
+                    border-radius:14px;padding:20px 22px;
+                    border:1.5px solid #93c5fd;
+                    box-shadow:0 4px 16px rgba(59,130,246,.15);">
+            <div style="font-size:1.3rem;margin-bottom:10px;">💡</div>
+            <strong style="display:block;margin-bottom:10px;font-size:.8rem;text-transform:uppercase;
+                           letter-spacing:.08em;color:#1d4ed8;">Orientación antes de comenzar</strong>
+            En esta sección evalúa comportamientos observables de liderazgo vividos durante el periodo evaluado. Evita responder por simpatía personal o por un hecho aislado; piensa en la forma habitual en que tu líder orienta, acompaña, comunica y cuida al equipo.
         </div>
         <button onclick="cerrarBienvenidaModal()"
                 style="padding:12px 36px;background:#0058af;color:#fff;border:none;
@@ -433,8 +453,8 @@ foreach ($mapPreg as $local => $real) {
                 <div class="ev-banner-body">Esta sección evalúa la capacidad de tu líder para inspirar, guiar y potenciar a su equipo, alineando objetivos organizacionales con el propósito colectivo. Valoramos el liderazgo que no solo dirige, sino que transforma, construyendo un entorno de confianza, respeto y crecimiento continuo.</div>
             </div>
             <div class="ev-step" id="ev-step">Pregunta 1 de 5</div>
-            <h2 class="ev-title">Propósito</h2>
-            <div class="ev-question">¿Cómo tu líder traduce la visión y objetivos de la organización en metas claras y alcanzables para su equipo, y de qué manera asegura que cada miembro comprenda el impacto de su contribución al éxito colectivo de la clínica?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataLider[0]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataLider[0]['PREGUNTA'] ?: $compDataLider[0]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 4, 'Sobresaliente')">
@@ -482,8 +502,8 @@ foreach ($mapPreg as $local => $real) {
         </div>
         <div class="ev-section" id="ev-section-5">
             <div class="ev-step" id="ev-step-5">Pregunta 2 de 5</div>
-            <h2 class="ev-title">Colaboración</h2>
-            <div class="ev-question">¿Cómo tu líder fomenta la colaboración, resolviendo conflictos de manera proactiva y creando un entorno donde los equipos trabajan unidos para alcanzar metas comunes, sin barreras entre procesos y funciones?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataLider[1]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataLider[1]['PREGUNTA'] ?: $compDataLider[1]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 5, 'Sobresaliente')">
@@ -531,8 +551,8 @@ foreach ($mapPreg as $local => $real) {
         </div>
         <div class="ev-section" id="ev-section-6">
             <div class="ev-step" id="ev-step-6">Pregunta 3 de 5</div>
-            <h2 class="ev-title">Consistencia</h2>
-            <div class="ev-question">¿En qué medida tu líder actúa con ética y coherencia, tomando decisiones que reflejan los valores y políticas de la organización, y cómo eso inspira confianza y seguridad en el equipo?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataLider[2]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataLider[2]['PREGUNTA'] ?: $compDataLider[2]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 6, 'Sobresaliente')">
@@ -580,8 +600,8 @@ foreach ($mapPreg as $local => $real) {
         </div>
         <div class="ev-section" id="ev-section-7">
             <div class="ev-step" id="ev-step-7">Pregunta 4 de 5</div>
-            <h2 class="ev-title">Adaptabilidad</h2>
-            <div class="ev-question">¿Cómo tu líder ajusta su enfoque y estrategia en respuesta a los cambios organizacionales o del entorno, y en qué medida fomenta la creatividad, la innovación y la flexibilidad dentro de su equipo para mantener el impulso hacia la excelencia?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataLider[3]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataLider[3]['PREGUNTA'] ?: $compDataLider[3]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 7, 'Sobresaliente')">
@@ -629,8 +649,8 @@ foreach ($mapPreg as $local => $real) {
         </div>
         <div class="ev-section" id="ev-section-8">
             <div class="ev-step" id="ev-step-8">Pregunta 5 de 5</div>
-            <h2 class="ev-title">Amor</h2>
-            <div class="ev-question">¿De qué manera tu líder demuestra un compromiso genuino con el bienestar emocional y físico del equipo, atendiendo tanto a las necesidades individuales como colectivas, y guiando sus acciones con principios de amor y compasión, en consonancia con la sabiduría y la paz que nos inspira nuestro amor a Dios?</div>
+            <h2 class="ev-title"><?= htmlspecialchars($compDataLider[4]['NOMBRE']) ?></h2>
+            <div class="ev-question"><?= htmlspecialchars($compDataLider[4]['PREGUNTA'] ?: $compDataLider[4]['NOMBRE']) ?></div>
             <div class="ev-options">
                 <button type="button" class="ev-option ev-opt-sobresaliente"
                         onclick="evSelectOption(this, 8, 'Sobresaliente')">

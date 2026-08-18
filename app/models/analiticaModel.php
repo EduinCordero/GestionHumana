@@ -878,22 +878,29 @@ class analiticaModel extends mainModel {
         // KPIs: quiénes aplican y cuántos han completado cada parte
         $sqlKpi = "
             SELECT
-                COUNT(DISTINCT HE.IDEMPLEADO)         AS TOTAL_APLICAN,
-                COUNT(DISTINCT EC.IDEMPLEADO)          AS COMPLETARON_COLAB,
-                COUNT(DISTINCT EL.IDEMPLEADO)          AS COMPLETARON_LIDER,
+                COUNT(DISTINCT HE.IDEMPLEADO)                                   AS TOTAL_APLICAN,
+                COUNT(DISTINCT EC.IDEMPLEADO)                                    AS COMPLETARON_LIDER,
+                COUNT(DISTINCT CASE WHEN HL_EA.IDEMPLEADO IS NOT NULL
+                                    THEN HE.IDEMPLEADO END)                      AS TOTAL_APLICA_COLAB,
+                COUNT(DISTINCT EL.IDEMPLEADO)                                    AS COMPLETARON_COLAB,
                 ROUND(COUNT(DISTINCT EC.IDEMPLEADO) * 100.0
-                      / NULLIF(COUNT(DISTINCT HE.IDEMPLEADO), 0), 1) AS PCT_COLAB,
+                      / NULLIF(COUNT(DISTINCT HE.IDEMPLEADO), 0), 1)             AS PCT_LIDER,
                 ROUND(COUNT(DISTINCT EL.IDEMPLEADO) * 100.0
-                      / NULLIF(COUNT(DISTINCT HE.IDEMPLEADO), 0), 1) AS PCT_LIDER
+                      / NULLIF(COUNT(DISTINCT CASE WHEN HL_EA.IDEMPLEADO IS NOT NULL
+                                                   THEN HE.IDEMPLEADO END), 0), 1) AS PCT_COLAB
             FROM VAADINWEB.HUMEMPLEADOEVAL HE
             LEFT JOIN (
                 SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
                 WHERE TIPO_EVAL = 'EXPERIENCIA_COLAB' AND CONFIRMADO = 1 $filtroP
             ) EC ON HE.IDEMPLEADO = EC.IDEMPLEADO
             LEFT JOIN (
-                SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
+                SELECT DISTINCT IDEMPLEADO_EVAL AS IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
                 WHERE TIPO_EVAL = 'EXPERIENCIA_LIDER' AND CONFIRMADO = 1 $filtroP
             ) EL ON HE.IDEMPLEADO = EL.IDEMPLEADO
+            LEFT JOIN VAADINWEB.HUMEMPLEADOEVAL HL_EA
+                ON HE.IDEMPLEADO_EVAL = HL_EA.IDEMPLEADO
+               AND HL_EA.ACTIVO = 1
+               AND (HL_EA.IDROL = 1 OR HL_EA.APLICA_EXP_AZUL = 1)
             WHERE HE.ACTIVO = 1 AND (HE.IDROL = 1 OR HE.APLICA_EXP_AZUL = 1)";
         $resKpi = $this->ejecutarConsulta($sqlKpi);
         $kpi    = $resKpi ? oci_fetch_assoc($resKpi) : [];
@@ -926,8 +933,10 @@ class analiticaModel extends mainModel {
         $sqlPend = "
             SELECT HE.IDEMPLEADO, HE.NOMBRE AS COLABORADOR, HE.CARGO, HE.PROCESO,
                    NVL(HL.NOMBRE,'—') AS LIDER,
-                   CASE WHEN EC.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_COLAB,
-                   CASE WHEN EL.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_LIDER
+                   CASE WHEN EC.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_LIDER,
+                   CASE WHEN HL_EA.IDEMPLEADO IS NULL THEN 2
+                        WHEN EL.IDEMPLEADO IS NOT NULL THEN 1
+                        ELSE 0 END AS HIZO_COLAB
             FROM VAADINWEB.HUMEMPLEADOEVAL HE
             LEFT JOIN VAADINWEB.HUMEMPLEADOEVAL HL ON HE.IDEMPLEADO_EVAL = HL.IDEMPLEADO
             LEFT JOIN (
@@ -935,11 +944,16 @@ class analiticaModel extends mainModel {
                 WHERE TIPO_EVAL = 'EXPERIENCIA_COLAB' AND CONFIRMADO = 1 $filtroP
             ) EC ON HE.IDEMPLEADO = EC.IDEMPLEADO
             LEFT JOIN (
-                SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
+                SELECT DISTINCT IDEMPLEADO_EVAL AS IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
                 WHERE TIPO_EVAL = 'EXPERIENCIA_LIDER' AND CONFIRMADO = 1 $filtroP
             ) EL ON HE.IDEMPLEADO = EL.IDEMPLEADO
+            LEFT JOIN VAADINWEB.HUMEMPLEADOEVAL HL_EA
+                ON HE.IDEMPLEADO_EVAL = HL_EA.IDEMPLEADO
+               AND HL_EA.ACTIVO = 1
+               AND (HL_EA.IDROL = 1 OR HL_EA.APLICA_EXP_AZUL = 1)
             WHERE HE.ACTIVO = 1 AND (HE.IDROL = 1 OR HE.APLICA_EXP_AZUL = 1)
-              AND (EC.IDEMPLEADO IS NULL OR EL.IDEMPLEADO IS NULL)
+              AND (EC.IDEMPLEADO IS NULL
+                   OR (HL_EA.IDEMPLEADO IS NOT NULL AND EL.IDEMPLEADO IS NULL))
             ORDER BY HE.PROCESO ASC, HE.NOMBRE ASC";
         $resPend = $this->ejecutarConsulta($sqlPend);
         $pendientes = [];
@@ -955,8 +969,10 @@ class analiticaModel extends mainModel {
                    NVL(TRIM(GE.PNOMBRE||' '||NVL(GE.SNOMBRE||' ','')||GE.PAPELLIDO||NVL(' '||GE.SAPELLIDO,'')), HE.NOMBRE) AS COLABORADOR,
                    HE.CARGO, HE.PROCESO,
                    NVL(HL.NOMBRE,'—') AS LIDER,
-                   CASE WHEN EC.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_COLAB,
-                   CASE WHEN EL.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_LIDER,
+                   CASE WHEN EC.IDEMPLEADO IS NOT NULL THEN 1 ELSE 0 END AS HIZO_LIDER,
+                   CASE WHEN HL_EA.IDEMPLEADO IS NULL THEN 2
+                        WHEN EL.IDEMPLEADO IS NOT NULL THEN 1
+                        ELSE 0 END AS HIZO_COLAB,
                    ROUND(NVL(PROM_C.PROM, 0), 2) AS PROM_COLAB,
                    ROUND(NVL(PROM_L.PROM, 0), 2) AS PROM_LIDER
             FROM VAADINWEB.HUMEMPLEADOEVAL HE
@@ -967,9 +983,13 @@ class analiticaModel extends mainModel {
                 WHERE TIPO_EVAL = 'EXPERIENCIA_COLAB' AND CONFIRMADO = 1 $filtroP
             ) EC ON HE.IDEMPLEADO = EC.IDEMPLEADO
             LEFT JOIN (
-                SELECT DISTINCT IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
+                SELECT DISTINCT IDEMPLEADO_EVAL AS IDEMPLEADO FROM VAADINWEB.HUMRESPUESTA
                 WHERE TIPO_EVAL = 'EXPERIENCIA_LIDER' AND CONFIRMADO = 1 $filtroP
             ) EL ON HE.IDEMPLEADO = EL.IDEMPLEADO
+            LEFT JOIN VAADINWEB.HUMEMPLEADOEVAL HL_EA
+                ON HE.IDEMPLEADO_EVAL = HL_EA.IDEMPLEADO
+               AND HL_EA.ACTIVO = 1
+               AND (HL_EA.IDROL = 1 OR HL_EA.APLICA_EXP_AZUL = 1)
             LEFT JOIN (
                 SELECT R.IDEMPLEADO, ROUND(AVG(O.VALOR),2) AS PROM
                 FROM VAADINWEB.HUMRESPUESTA R
@@ -978,11 +998,11 @@ class analiticaModel extends mainModel {
                 GROUP BY R.IDEMPLEADO
             ) PROM_C ON HE.IDEMPLEADO = PROM_C.IDEMPLEADO
             LEFT JOIN (
-                SELECT R.IDEMPLEADO, ROUND(AVG(O.VALOR),2) AS PROM
+                SELECT R.IDEMPLEADO_EVAL AS IDEMPLEADO, ROUND(AVG(O.VALOR),2) AS PROM
                 FROM VAADINWEB.HUMRESPUESTA R
                 INNER JOIN VAADINWEB.HUMOPCIONESCALA O ON R.IDOPCION = O.IDOPCION
                 WHERE R.TIPO_EVAL = 'EXPERIENCIA_LIDER' AND R.CONFIRMADO = 1 $filtroP
-                GROUP BY R.IDEMPLEADO
+                GROUP BY R.IDEMPLEADO_EVAL
             ) PROM_L ON HE.IDEMPLEADO = PROM_L.IDEMPLEADO
             WHERE HE.ACTIVO = 1 AND (HE.IDROL = 1 OR HE.APLICA_EXP_AZUL = 1)
               AND (EC.IDEMPLEADO IS NOT NULL OR EL.IDEMPLEADO IS NOT NULL)
@@ -1070,9 +1090,10 @@ class analiticaModel extends mainModel {
     // RANKING — Top N colaboradores por promedio
     // ══════════════════════════════════════════════════════════════════════════
 
-    public function getTopColaboradores(?array $periodo, string $tipoEval = 'LIDER_A_COLAB', string $proceso = '', int $limit = 10): array {
+    public function getTopColaboradores(?array $periodo, string $tipoEval = 'LIDER_A_COLAB', string $proceso = '', int $limit = 10, string $order = 'DESC'): array {
         $tiposOk = ['LIDER_A_COLAB', 'AUTO', 'COLAB_A_LIDER'];
         if (!in_array($tipoEval, $tiposOk)) $tipoEval = 'LIDER_A_COLAB';
+        $order = strtoupper($order) === 'ASC' ? 'ASC' : 'DESC';
         $limit = max(1, min(50, $limit));
 
         $idP     = $periodo ? (int)$periodo['IDPERIODO'] : 0;
@@ -1121,7 +1142,7 @@ class analiticaModel extends mainModel {
                 GROUP BY E.IDEMPLEADO, E.NOMBRE, E.CARGO, E.PROCESO,
                          GE.PNOMBRE, GE.PAPELLIDO,
                          AC.TOTAL_AC, AC.PEND_AC, AC.APRO_AC
-                ORDER BY AVG(OS.VALOR) DESC
+                ORDER BY AVG(OS.VALOR) $order
             ) WHERE ROWNUM <= $limit";
 
         $res  = $this->ejecutarConsulta($sqlBase);
@@ -1191,5 +1212,102 @@ class analiticaModel extends mainModel {
     public function getExpAzulEvaluadosParaExport(?array $periodo): array {
         $data = $this->getResumenExpAzul($periodo);
         return $data['evaluados'] ?? [];
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SEGUIMIENTO DE FEEDBACK — KPIs globales + desglose por líder
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public function getResumenFeedback(?array $periodo): array {
+        $idP = $periodo ? (int)$periodo['IDPERIODO'] : 0;
+        if (!$idP) return ['kpis' => [], 'porLider' => []];
+
+        // ── KPIs globales de feedback ──────────────────────────────────────
+        $sqlKpi = "
+            SELECT
+                COUNT(CASE WHEN TIPO_FEEDBACK = 1 THEN 1 END) AS FL1_TOTAL,
+                COUNT(CASE WHEN TIPO_FEEDBACK = 1 AND NVL(FIRMADO_COLAB,0) = 1 THEN 1 END) AS FL1_FIRMADOS,
+                COUNT(CASE WHEN TIPO_FEEDBACK = 2 THEN 1 END) AS FL2_TOTAL,
+                COUNT(CASE WHEN TIPO_FEEDBACK = 2 AND NVL(FIRMADO_LIDER,0) = 1 THEN 1 END) AS FL2_FIRMADOS,
+                COUNT(CASE WHEN TIPO_FEEDBACK = 3 THEN 1 END) AS FL3_TOTAL,
+                COUNT(CASE WHEN TIPO_FEEDBACK = 3 AND NVL(FIRMADO_COLAB,0) = 1 THEN 1 END) AS FL3_FIRMADOS
+            FROM VAADINWEB.HUMFEEDBACK
+            WHERE IDPERIODO = $idP";
+        $resKpi = $this->ejecutarConsulta($sqlKpi);
+        $kpis   = $resKpi ? (oci_fetch_assoc($resKpi) ?: []) : [];
+        if ($resKpi) oci_free_statement($resKpi);
+
+        // SMART globales
+        $sqlSmart = "
+            SELECT COUNT(*) AS TOTAL,
+                   COUNT(CASE WHEN ESTADO = 'APROBADO' THEN 1 END) AS APROBADOS
+            FROM VAADINWEB.HUMACUERDOMEJORA
+            WHERE IDPERIODO = $idP AND NUM_COMPETENCIA BETWEEN 1 AND 11";
+        $resSmart = $this->ejecutarConsulta($sqlSmart);
+        $rowSmart = $resSmart ? (oci_fetch_assoc($resSmart) ?: []) : [];
+        if ($resSmart) oci_free_statement($resSmart);
+        $kpis['SMART_TOTAL']     = (int)($rowSmart['TOTAL']    ?? 0);
+        $kpis['SMART_APROBADOS'] = (int)($rowSmart['APROBADOS'] ?? 0);
+        foreach (['FL1_TOTAL','FL1_FIRMADOS','FL2_TOTAL','FL2_FIRMADOS',
+                  'FL3_TOTAL','FL3_FIRMADOS'] as $k)
+            $kpis[$k] = (int)($kpis[$k] ?? 0);
+
+        // ── Por líder ──────────────────────────────────────────────────────
+        $sqlL = "
+            SELECT
+                HE.IDEMPLEADO_EVAL                                       AS IDEMPLEADO,
+                MAX(NVL(TRIM(GE.PNOMBRE||NVL2(TRIM(GE.SNOMBRE),' '||GE.SNOMBRE,'')||' '||GE.PAPELLIDO||NVL2(TRIM(GE.SAPELLIDO),' '||GE.SAPELLIDO,'')), L.NOMBRE)) AS NOMBRE,
+                MAX(L.CARGO)                                             AS CARGO,
+                MAX(L.PROCESO)                                           AS PROCESO,
+                COUNT(HE.IDEMPLEADO)                                     AS TOTAL_COLAB,
+                NVL(MAX(FB.FL1_FEEDBACK), 0)                             AS FL1_FEEDBACK,
+                NVL(MAX(FB.FL1_FIRMADOS), 0)                             AS FL1_FIRMADOS,
+                NVL(MAX(FB.FL2_FEEDBACK), 0)                             AS FL2_FEEDBACK,
+                NVL(MAX(FB.FL2_FIRMADOS), 0)                             AS FL2_FIRMADOS,
+                NVL(MAX(FB.FL3_FEEDBACK), 0)                             AS FL3_FEEDBACK,
+                NVL(MAX(FB.FL3_FIRMADOS), 0)                             AS FL3_FIRMADOS,
+                COUNT(CASE WHEN HE.ES_LIDER_FUNCIONAL = 1 THEN 1 END) * MAX(NVL(L.ES_DIRECTOR,0)) AS COLABS_FL2,
+                COUNT(CASE WHEN HE.APLICA_EXP_AZUL    = 1 THEN 1 END)   AS COLABS_FL3,
+                NVL(MAX(AC.SMART_TOTAL), 0)                              AS SMART_TOTAL,
+                NVL(MAX(AC.SMART_APROBADOS), 0)                          AS SMART_APROBADOS
+            FROM VAADINWEB.HUMEMPLEADOEVAL HE
+            JOIN VAADINWEB.HUMEMPLEADOEVAL L
+                ON HE.IDEMPLEADO_EVAL = L.IDEMPLEADO AND L.ACTIVO = 1
+            LEFT JOIN ZAYMAWEB.GHEMPEMPLEADOS GE
+                ON HE.IDEMPLEADO_EVAL = GE.IDEMPLEADO
+            LEFT JOIN (
+                SELECT IDEMPLEADO_LIDER,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 1 THEN 1 END)                               AS FL1_FEEDBACK,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 1 AND NVL(FIRMADO_COLAB,0) = 1 THEN 1 END) AS FL1_FIRMADOS,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 2 THEN 1 END)                               AS FL2_FEEDBACK,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 2 AND NVL(FIRMADO_LIDER,0) = 1 THEN 1 END) AS FL2_FIRMADOS,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 3 THEN 1 END)                               AS FL3_FEEDBACK,
+                       COUNT(CASE WHEN TIPO_FEEDBACK = 3 AND NVL(FIRMADO_COLAB,0) = 1 THEN 1 END) AS FL3_FIRMADOS
+                FROM VAADINWEB.HUMFEEDBACK
+                WHERE IDPERIODO = $idP
+                GROUP BY IDEMPLEADO_LIDER
+            ) FB ON HE.IDEMPLEADO_EVAL = FB.IDEMPLEADO_LIDER
+            LEFT JOIN (
+                SELECT IDEMPLEADO_LIDER,
+                       COUNT(*) AS SMART_TOTAL,
+                       COUNT(CASE WHEN ESTADO = 'APROBADO' THEN 1 END) AS SMART_APROBADOS
+                FROM VAADINWEB.HUMACUERDOMEJORA
+                WHERE IDPERIODO = $idP AND NUM_COMPETENCIA BETWEEN 1 AND 11
+                GROUP BY IDEMPLEADO_LIDER
+            ) AC ON HE.IDEMPLEADO_EVAL = AC.IDEMPLEADO_LIDER
+            WHERE HE.ACTIVO = 1 AND HE.IDROL IN (1, 2, 3)
+            GROUP BY HE.IDEMPLEADO_EVAL
+            ORDER BY MAX(NVL(GE.PAPELLIDO||' '||GE.PNOMBRE, L.NOMBRE))";
+
+        $resL = $this->ejecutarConsulta($sqlL);
+        $rows = [];
+        if ($resL) {
+            while ($r = oci_fetch_assoc($resL)) {
+                $rows[] = $this->enc($r, ['NOMBRE','CARGO','PROCESO']);
+            }
+            oci_free_statement($resL);
+        }
+
+        return ['kpis' => $kpis, 'porLider' => $rows];
     }
 }

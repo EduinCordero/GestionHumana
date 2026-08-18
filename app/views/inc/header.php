@@ -57,11 +57,11 @@ $subMenus = [
         ['tab'=>'ranking',       'icon'=>'ti-trophy',           'label'=>'Ranking'],
         ['tab'=>'historico',     'icon'=>'ti-timeline',         'label'=>'Histórico'],
         ['tab'=>'acuerdos',      'icon'=>'ti-clipboard-list',   'label'=>'Acuerdos'],
-        ['tab'=>'procesos',      'icon'=>'ti-building',         'label'=>'Procesos'],
         ['tab'=>'alertas',       'icon'=>'ti-alert-triangle',   'label'=>'Alertas'],
         ['tab'=>'colaboradores', 'icon'=>'ti-users',            'label'=>'Colaboradores'],
         ['tab'=>'brechas',       'icon'=>'ti-git-compare',      'label'=>'Brechas'],
         ['tab'=>'exp_azul',      'icon'=>'ti-droplet',          'label'=>'Exp. Azul'],
+        ['tab'=>'feedback',      'icon'=>'ti-message-check',    'label'=>'Feedback'],
     ],
     'liderPanel' => [
         ['tab'=>'dashboard', 'icon'=>'ti-speedometer',      'label'=>'Dashboard'],
@@ -77,10 +77,10 @@ $navItems = [
     ['url' => 'evaluarList', 'icon' => 'ti-clipboard-check', 'label' => 'Evaluaciones'],
     ['url' => 'feedback',    'icon' => 'ti-message-circle',  'label' => 'Feedback',        'liderOnly' => true],
     ['url' => 'reportes',    'icon' => 'ti-chart-bar',       'label' => 'Reportes',        'sub' => true],
-    ['url' => 'liderPanel',  'icon' => 'ti-layout-dashboard','label' => 'Panel Líder',     'sub' => true, 'liderOnly' => true],
+  //  ['url' => 'liderPanel',  'icon' => 'ti-layout-dashboard','label' => 'Panel Líder',     'sub' => true, 'liderOnly' => true],
     ['url' => 'seguridad',   'icon' => 'ti-shield-lock',     'label' => 'Seguridad'],
     ['url' => 'admin',       'icon' => 'ti-settings',        'label' => 'Admin',           'sub' => true, 'adminOnly' => true],
-  //  ['url' => 'analitica',   'icon' => 'ti-chart-histogram', 'label' => 'Analítica',       'sub' => true, 'adminOnly' => true],
+    ['url' => 'analitica',   'icon' => 'ti-chart-histogram', 'label' => 'Analítica',       'sub' => true, 'adminOnly' => true],
 ];
 ?>
 
@@ -776,13 +776,13 @@ try {
         }
     }
 
-    // 2. Tiene feedback pendiente de firmar (Proceso 1)?
+    // 2. Tiene feedback FL1 pendiente de firmar?
     if ($idempleadoSb) {
         $sqlSb2 = "SELECT COUNT(*) AS CNT FROM VAADINWEB.HUMFEEDBACK
                    WHERE IDEMPLEADO = $idempleadoSb AND TIPO_FEEDBACK = 1
-                     AND FIRMADO_COLAB = 0 AND IDPERIODO = (
-                         SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
-                         WHERE ESTADO = 1 AND ROWNUM = 1)";
+                     AND (FIRMADO_COLAB IS NULL OR FIRMADO_COLAB = 0)
+                     AND IDPERIODO = (SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
+                                      WHERE ESTADO = 1 AND ROWNUM = 1)";
         $qSb2 = oci_parse($connSb, $sqlSb2);
         if ($qSb2 && oci_execute($qSb2)) {
             $rSb2 = oci_fetch_assoc($qSb2);
@@ -793,6 +793,65 @@ try {
                     'url'=>'reportes'];
             }
             oci_free_statement($qSb2);
+        }
+    }
+
+    // 2b. Tiene feedback FL2 pendiente de firmar (como líder que recibió feedback del director)?
+    if ($idempleadoSb) {
+        $sqlSb2b = "SELECT COUNT(*) AS CNT FROM VAADINWEB.HUMFEEDBACK
+                    WHERE IDEMPLEADO = $idempleadoSb AND TIPO_FEEDBACK = 2
+                      AND (FIRMADO_COLAB IS NULL OR FIRMADO_COLAB = 0)
+                      AND IDPERIODO = (SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
+                                       WHERE ESTADO = 1 AND ROWNUM = 1)";
+        $qSb2b = oci_parse($connSb, $sqlSb2b);
+        if ($qSb2b && oci_execute($qSb2b)) {
+            $rSb2b = oci_fetch_assoc($qSb2b);
+            if ((int)($rSb2b['CNT'] ?? 0) > 0) {
+                $sbNotifs[] = ['type'=>'alert','icon'=>'ti-signature',
+                    'title'=>'Feedback de liderazgo pendiente de firma',
+                    'desc'=>'El director te ha dejado feedback de liderazgo. Fírmalo para activar tu plan.',
+                    'url'=>'reportes'];
+            }
+            oci_free_statement($qSb2b);
+        }
+    }
+
+    // 2c. Tiene feedback EA pendiente de firmar (como colaborador asistencial)?
+    if ($idempleadoSb) {
+        $sqlSb2c = "SELECT COUNT(*) AS CNT FROM VAADINWEB.HUMFEEDBACK
+                    WHERE IDEMPLEADO = $idempleadoSb AND TIPO_FEEDBACK = 3
+                      AND (FIRMADO_COLAB IS NULL OR FIRMADO_COLAB = 0)
+                      AND IDPERIODO = (SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
+                                       WHERE ESTADO = 1 AND ROWNUM = 1)";
+        $qSb2c = oci_parse($connSb, $sqlSb2c);
+        if ($qSb2c && oci_execute($qSb2c)) {
+            $rSb2c = oci_fetch_assoc($qSb2c);
+            if ((int)($rSb2c['CNT'] ?? 0) > 0) {
+                $sbNotifs[] = ['type'=>'alert','icon'=>'ti-signature',
+                    'title'=>'Experiencia Azul pendiente de firma',
+                    'desc'=>'Tu líder te asignó objetivos de Experiencia Azul. Fírmalos para activar tu plan.',
+                    'url'=>'reportes'];
+            }
+            oci_free_statement($qSb2c);
+        }
+    }
+
+    // 2d. Tiene objetivos SMART asignados pendientes de firma?
+    if ($idempleadoSb) {
+        $sqlSb2d = "SELECT COUNT(*) AS CNT FROM VAADINWEB.HUMACUERDOMEJORA
+                    WHERE IDEMPLEADO = $idempleadoSb AND ESTADO = 'PENDIENTE_FIRMA'
+                      AND IDPERIODO = (SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
+                                       WHERE ESTADO = 1 AND ROWNUM = 1)";
+        $qSb2d = oci_parse($connSb, $sqlSb2d);
+        if ($qSb2d && oci_execute($qSb2d)) {
+            $rSb2d = oci_fetch_assoc($qSb2d);
+            if ((int)($rSb2d['CNT'] ?? 0) > 0) {
+                $sbNotifs[] = ['type'=>'warn','icon'=>'ti-target',
+                    'title'=>'Objetivos SMART por firmar',
+                    'desc'=>'Tu líder te asignó objetivos SMART. Revísalos y firma tu conformidad.',
+                    'url'=>'reportes'];
+            }
+            oci_free_statement($qSb2d);
         }
     }
 
@@ -845,6 +904,28 @@ try {
                         'url'=>'feedback'];
                 }
                 oci_free_statement($qFbPend);
+            }
+
+            // 5. Tiene feedback Experiencia Azul sin registrar a algún colaborador asistencial?
+            $sqlEaSinFb = "SELECT COUNT(*) AS CNT
+                           FROM VAADINWEB.HUMEMPLEADOEVAL HE
+                           WHERE HE.IDEMPLEADO_EVAL = $idempleadoSb AND HE.ACTIVO = 1
+                             AND HE.APLICA_EXP_AZUL = 1
+                             AND HE.IDEMPLEADO NOT IN (
+                                 SELECT IDEMPLEADO FROM VAADINWEB.HUMFEEDBACK
+                                 WHERE IDEMPLEADO_LIDER = $idempleadoSb AND TIPO_FEEDBACK = 3
+                                   AND IDPERIODO = (SELECT IDPERIODO FROM VAADINWEB.HUMPERIODOEVALUACION
+                                                    WHERE ESTADO = 1 AND ROWNUM = 1))";
+            $qEaSinFb = oci_parse($connSb, $sqlEaSinFb);
+            if ($qEaSinFb && oci_execute($qEaSinFb)) {
+                $rEaSinFb = oci_fetch_assoc($qEaSinFb);
+                if ((int)($rEaSinFb['CNT'] ?? 0) > 0) {
+                    $sbNotifs[] = ['type'=>'warn','icon'=>'ti-star',
+                        'title'=>'Feedback Experiencia Azul pendiente',
+                        'desc'=>'Tienes colaboradores asistenciales sin feedback de Experiencia Azul registrado.',
+                        'url'=>'feedback'];
+                }
+                oci_free_statement($qEaSinFb);
             }
         }
     }

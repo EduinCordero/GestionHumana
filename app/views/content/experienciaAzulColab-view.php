@@ -297,9 +297,19 @@ foreach ($competenciasEA as $idx => $comp):
                 box-shadow:0 24px 64px rgba(0,0,0,.25);animation:evModalIn .3s ease;text-align:center;">
         <div style="font-size:2.4rem;margin-bottom:14px;">🔵</div>
         <div style="font-size:1.05rem;font-weight:800;color:#1e3a5f;margin-bottom:14px;">Experiencia Azul — Evaluación al Colaborador</div>
-        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:28px;text-align:left;
+        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:16px;text-align:left;
                     background:#f0f6ff;border-radius:12px;padding:16px 20px;border:1px solid #bfdbfe;">
             Como líder, evaluarás la <strong>Experiencia Azul del colaborador</strong> que acabas de evaluar. Esta sección mide la calidad de su atención al paciente. La escala es diferente: <strong>Referente · Consistente · Esperado · Inconsistente · Crítico</strong>.
+        </div>
+        <div style="font-size:.88rem;color:#1e3a5f;line-height:1.8;margin-bottom:28px;text-align:center;
+                    background:linear-gradient(135deg,#dbeafe,#eff6ff);
+                    border-radius:14px;padding:20px 22px;
+                    border:1.5px solid #93c5fd;
+                    box-shadow:0 4px 16px rgba(59,130,246,.15);">
+            <div style="font-size:1.3rem;margin-bottom:10px;">💡</div>
+            <strong style="display:block;margin-bottom:10px;font-size:.8rem;text-transform:uppercase;
+                           letter-spacing:.08em;color:#1d4ed8;">Orientación antes de comenzar</strong>
+            Evalúa los comportamientos observados durante el periodo evaluado Junio de 2025 a junio de 2026, teniendo en cuenta las responsabilidades del cargo, el contexto del servicio y las situaciones reales del día a día. Evita calificar con base en simpatías personales, hechos aislados o percepciones sin evidencia.
         </div>
         <button onclick="cerrarEABienvenida()"
                 style="padding:12px 36px;background:#0058af;color:#fff;border:none;

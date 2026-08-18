@@ -4,6 +4,13 @@ $feedbackActivo = $feedbackActivo ?? true;  // true por defecto para no romper s
 $esAdmin        = $esAdmin        ?? false;
 $periodoActivo  = $periodoActivo  ?? null;
 
+// Verificar si el período ha vencido — activo hasta las 23:59:59 del día de cierre
+$periodoVencido = false;
+if ($periodoActivo) {
+    $finLock = DateTime::createFromFormat('d/m/Y H:i:s', ($periodoActivo['FECHACIERRE'] ?? '') . ' 23:59:59');
+    $periodoVencido = $finLock && new DateTime() > $finLock;
+}
+
 // ── PANTALLA DE BLOQUEO — solo líderes cuando feedback está deshabilitado ──
 if (!$feedbackActivo && !$esAdmin): ?>
 <style>
@@ -29,25 +36,41 @@ if (!$feedbackActivo && !$esAdmin): ?>
 
         <!-- Título -->
         <div style="font-size:1.25rem;font-weight:700;color:#1e293b;margin-bottom:10px;">
-            Proceso de Feedback no disponible
+            <?php if ($periodoVencido): ?>
+                Per&iacute;odo de evaluaci&oacute;n cerrado
+            <?php else: ?>
+                Proceso de Feedback no disponible
+            <?php endif; ?>
         </div>
 
         <!-- Mensaje -->
         <div style="font-size:.9rem;color:#64748b;line-height:1.75;max-width:440px;margin:0 auto 28px;">
-            El proceso de Feedback aún no ha sido habilitado por el equipo de
-            <strong>Gestión Humana</strong>. Una vez que las evaluaciones de desempeño
-            estén completas, recibirás una comunicación para iniciar esta etapa
-            con tu equipo.
+            <?php if ($periodoVencido): ?>
+                El per&iacute;odo de evaluaci&oacute;n ha finalizado el
+                <strong><?= htmlspecialchars($periodoActivo['FECHACIERRE'] ?? '') ?></strong>.
+                Ya no es posible registrar nuevas acciones de feedback para este per&iacute;odo.
+            <?php else: ?>
+                El proceso de Feedback a&uacute;n no ha sido habilitado por el equipo de
+                <strong>Gesti&oacute;n Humana</strong>. Una vez que las evaluaciones de desempe&ntilde;o
+                est&eacute;n completas, recibir&aacute;s una comunicaci&oacute;n para iniciar esta etapa
+                con tu equipo.
+            <?php endif; ?>
         </div>
 
-        <!-- Período activo -->
+        <!-- Período -->
         <?php if ($periodoActivo): ?>
         <div style="display:inline-flex;align-items:center;gap:8px;
+                    <?php if ($periodoVencido): ?>
+                    background:#fef2f2;border:1.5px solid #fca5a5;
+                    <?php else: ?>
                     background:#eff6ff;border:1.5px solid #bfdbfe;
+                    <?php endif; ?>
                     border-radius:10px;padding:10px 20px;
-                    font-size:.84rem;color:#1d4ed8;font-weight:500;">
+                    font-size:.84rem;font-weight:500;
+                    color:<?= $periodoVencido ? '#991b1b' : '#1d4ed8' ?>;">
             <i class="ti ti-calendar-event" style="font-size:16px;"></i>
-            Período activo: <strong><?= htmlspecialchars($periodoActivo['NOMBRE'] ?? '', ENT_QUOTES) ?></strong>
+            <?= $periodoVencido ? 'Per&iacute;odo cerrado' : 'Per&iacute;odo' ?>:
+            <strong><?= htmlspecialchars($periodoActivo['NOMBRE'] ?? '', ENT_QUOTES) ?></strong>
         </div>
         <?php endif; ?>
 
@@ -82,13 +105,19 @@ if (empty($nombresComp)) {
         5=>'Calidad',6=>'Disciplina',7=>'Formacion',8=>'SST',
         9=>'Relaciones',10=>'Eficacia',11=>'Tiempo y Recursos',
         12=>'Proposito',13=>'Colaboracion',14=>'Consistencia',15=>'Adaptabilidad',16=>'Amor',
+        17=>'Bienvenida y Trato Memorable',18=>'Comunicacion Empatica y Clara',
+        19=>'Personalizacion del Servicio',20=>'Eficiencia con Calidez',
+        21=>'Cierre y Continuidad del Servicio',22=>'Trabajo en Equipo Invisible',
     ];
 }
 
 // Variables por defecto para evitar errores
-$periodoActivo = $periodoActivo ?? null;
-$equipo = $equipo ?? [];
-$maxObjetivos = $maxObjetivos ?? 3;
+$periodoActivo  = $periodoActivo  ?? null;
+$equipo         = $equipo         ?? [];
+$equipoEA       = $equipoEA       ?? [];
+$maxObjetivos   = $maxObjetivos   ?? 3;
+
+// $periodoVencido ya fue calculado al inicio del archivo (antes de la pantalla de bloqueo)
 
 $calLabels = [
     1 => 'Insuficiente',
@@ -142,7 +171,41 @@ $calColors = [
 .fb-hero-dot { width:7px; height:7px; border-radius:50%; background:#4ade80; animation:fbPulse 2s infinite; }
 @keyframes fbPulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
 
-/* ── STATS ── */
+/* ── FLOW STATS ── */
+.fb-flow-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px; margin-bottom: 20px;
+}
+.fb-flow-card {
+    background: var(--fb-card);
+    border-radius: var(--fb-radius);
+    border: 1px solid var(--fb-border);
+    border-top: 3px solid var(--ffc, #0058af);
+    padding: 14px 16px 12px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.04);
+}
+.fb-ffc-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ffc, #0058af); margin-bottom: 12px;
+}
+.fb-ffc-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ffc, #0058af); flex-shrink: 0;
+}
+.fb-ffc-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 8px 12px; margin-bottom: 12px;
+}
+.fb-ffc-n { font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1; }
+.fb-ffc-l { font-size: .68rem; color: #64748b; margin-top: 2px; }
+.fb-ffc-prog-wrap { height: 4px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.fb-ffc-prog-bar  { height: 100%; background: var(--ffc, #0058af); border-radius: 2px; transition: width .4s; }
+.fb-ffc-pct { font-size: .67rem; color: #94a3b8; margin-top: 5px; text-align: right; }
+
+/* ── STATS (legacy, kept for compat) ── */
 .fb-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
 .fb-stat {
     background:var(--fb-card); border-radius:var(--fb-radius);
@@ -180,6 +243,22 @@ $calColors = [
 .fb-btn-outline:hover  { background:#eff6ff; }
 .fb-btn-done     { background:#f1f5f9; color:#94a3b8; cursor:default; }
 .fb-btn-sm       { padding:5px 12px; font-size:.75rem; }
+.fb-btn-seguimiento {
+    background: #eff6ff;
+    color: #1e40af;
+    border: 1.5px solid #93c5fd;
+    border-radius: 9999px;
+    padding: 5px 14px 5px 10px;
+    display: inline-flex; align-items: center; gap: 7px;
+}
+.fb-btn-seguimiento::before {
+    content: '';
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #3b82f6; flex-shrink: 0;
+}
+.fb-btn-seguimiento:hover {
+    background: #dbeafe; border-color: #60a5fa;
+}
 
 /* ── MODAL ── */
 .fb-modal-overlay {
@@ -221,6 +300,18 @@ $calColors = [
 .fb-modal-close:hover { background:rgba(255,255,255,.25); }
 .fb-modal-body   { padding:24px 28px; }
 .fb-modal-footer { padding:16px 28px; border-top:1px solid var(--fb-border); display:flex; justify-content:flex-end; gap:10px; }
+/* ── Accordion flujos ── */
+.fb-acc-body { overflow:hidden; transition:max-height .35s ease, opacity .3s ease; max-height:4000px; opacity:1; }
+.fb-acc-body.fb-collapsed { max-height:0 !important; opacity:0; }
+.fb-acc-chevron { display:flex;align-items:center;justify-content:center;width:28px;height:28px;
+                  border-radius:8px;background:rgba(0,88,175,.08);color:var(--fb-accent);
+                  transition:transform .3s ease,background .15s; cursor:pointer;flex-shrink:0; }
+.fb-acc-chevron:hover { background:rgba(0,88,175,.15); }
+.fb-acc-chevron.fb-collapsed { transform:rotate(-90deg); }
+.fb-card-head { cursor:pointer; user-select:none; }
+.fb-card-head:hover { background:rgba(0,88,175,.025); }
+.fb-prog-badge { font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:20px;
+                 white-space:nowrap;flex-shrink:0; }
 /* Stepper sobre fondo azul — labels blancos (Proceso 1 y Flujo 2) */
 .fb-modal-header .fb-step-label,
 #fl2ModalOverlay .fb-stepper .fb-step-label        { color:rgba(255,255,255,.45); }
@@ -359,14 +450,19 @@ $calColors = [
         <div class="fb-hero-title">Feedback</div>
         <div class="fb-hero-sub">Registra la reunión de retroalimentación y asigna objetivos SMART a tu equipo</div>
     </div>
-    <?php if ($periodoActivo): ?>
+    <?php if ($periodoActivo && !$periodoVencido): ?>
     <div class="fb-hero-badge">
         <div class="fb-hero-dot"></div>
-        Período activo · Cierre <?= htmlspecialchars($periodoActivo['FECHACIERRE']) ?>
+        Per&iacute;odo activo &middot; Cierre <?= htmlspecialchars($periodoActivo['FECHACIERRE']) ?>
+    </div>
+    <?php elseif ($periodoActivo && $periodoVencido): ?>
+    <div class="fb-hero-badge" style="background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);">
+        <div class="fb-hero-dot" style="background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.3);"></div>
+        Per&iacute;odo cerrado &middot; Venci&oacute; <?= htmlspecialchars($periodoActivo['FECHACIERRE']) ?>
     </div>
     <?php else: ?>
     <div class="fb-hero-badge" style="background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);">
-        Sin período activo
+        Sin per&iacute;odo activo
     </div>
     <?php endif; ?>
 </div>
@@ -380,36 +476,107 @@ $calColors = [
 <?php else: ?>
 
 <?php
-// Estadísticas del equipo
-$totalEq      = count($equipo);
-$conFeedback  = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1));
-$conAcuerdos  = count(array_filter($equipo, fn($c) => $c['TOTAL_ACUERDOS'] > 0));
-$completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 && $c['TOTAL_ACUERDOS'] >= $maxObjetivos));
+// ── FL1 · Desempeño General
+$fl1Total    = count($equipo);
+$fl1Feedback = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1));
+$fl1Obj      = count(array_filter($equipo, fn($c) => ($c['TOTAL_ACUERDOS'] ?? 0) > 0));
+$fl1Firmados = count(array_filter($equipo, fn($c) => ($c['FIRMADO_COLAB']  ?? 0) > 0));
+$fl1Pct      = $fl1Total ? round($fl1Firmados / $fl1Total * 100) : 0;
+
+// ── FL2 · Liderazgo (directores)
+$fl2Total    = count($lideresACargo ?? []);
+$fl2Feedback = count(array_filter($lideresACargo ?? [], fn($l) => ($l['IDFEEDBACK']        ?? 0) > 0));
+$fl2Obj      = count(array_filter($lideresACargo ?? [], fn($l) => ($l['TOTAL_OBJETIVOS_L2'] ?? 0) > 0));
+$fl2Firmados = count(array_filter($lideresACargo ?? [], fn($l) => ($l['FIRMADO_COLAB']      ?? 0) > 0));
+$fl2Pct      = $fl2Total ? round($fl2Firmados / $fl2Total * 100) : 0;
+
+// ── FL3 · Experiencia Azul
+$fl3Total    = count($equipoEA ?? []);
+$fl3Feedback = count(array_filter($equipoEA ?? [], fn($e) => ($e['TIENE_FEEDBACK_EA'] ?? 0) > 0));
+$fl3Obj      = count(array_filter($equipoEA ?? [], fn($e) => ($e['TOTAL_ACUERDOS_EA'] ?? 0) > 0));
+$fl3Firmados = count(array_filter($equipoEA ?? [], fn($e) => ($e['FIRMADO_COLAB_EA']  ?? 0) > 0));
+$fl3Pct      = $fl3Total ? round($fl3Firmados / $fl3Total * 100) : 0;
+
+// Compat con tour
+$totalEq = $fl1Total; $conFeedback = $fl1Feedback;
+$conAcuerdos = $fl1Obj; $completos = $fl1Firmados;
 ?>
 
-<!-- ── STATS ── -->
-<div class="fb-stats fb-fade fb-d2">
-    <div class="fb-stat">
-        <span class="fb-stat-n"><?= $totalEq ?></span>
-        <span class="fb-stat-l">Colaboradores</span>
+<!-- ── FLOW STATS ── -->
+<div class="fb-flow-stats fb-fade fb-d2">
+
+    <!-- FL1 · Desempeño General -->
+    <div class="fb-flow-card" style="--ffc:#0058af">
+        <div class="fb-ffc-label"><span class="fb-ffc-dot"></span>Desempeño</div>
+        <div class="fb-ffc-grid">
+            <div><div class="fb-ffc-n"><?= $fl1Total ?></div><div class="fb-ffc-l">Colaboradores</div></div>
+            <div><div class="fb-ffc-n"><?= $fl1Feedback ?></div><div class="fb-ffc-l">Con feedback</div></div>
+            <div><div class="fb-ffc-n"><?= $fl1Obj ?></div><div class="fb-ffc-l">Con objetivos</div></div>
+            <div><div class="fb-ffc-n"><?= $fl1Firmados ?></div><div class="fb-ffc-l">Firmados</div></div>
+        </div>
+        <div class="fb-ffc-prog-wrap"><div class="fb-ffc-prog-bar" style="width:<?= $fl1Pct ?>%"></div></div>
+        <div class="fb-ffc-pct"><?= $fl1Pct ?>% firmado</div>
     </div>
-    <div class="fb-stat">
-        <span class="fb-stat-n"><?= $conFeedback ?></span>
-        <span class="fb-stat-l">Con feedback</span>
+
+    <?php if ($fl2Total > 0): ?>
+    <!-- FL2 · Liderazgo -->
+    <div class="fb-flow-card" style="--ffc:#7c3aed">
+        <div class="fb-ffc-label"><span class="fb-ffc-dot"></span>Liderazgo</div>
+        <div class="fb-ffc-grid">
+            <div><div class="fb-ffc-n"><?= $fl2Total ?></div><div class="fb-ffc-l">Líderes</div></div>
+            <div><div class="fb-ffc-n"><?= $fl2Feedback ?></div><div class="fb-ffc-l">Con feedback</div></div>
+            <div><div class="fb-ffc-n"><?= $fl2Obj ?></div><div class="fb-ffc-l">Con objetivos</div></div>
+            <div><div class="fb-ffc-n"><?= $fl2Firmados ?></div><div class="fb-ffc-l">Firmados</div></div>
+        </div>
+        <div class="fb-ffc-prog-wrap"><div class="fb-ffc-prog-bar" style="width:<?= $fl2Pct ?>%"></div></div>
+        <div class="fb-ffc-pct"><?= $fl2Pct ?>% firmado</div>
     </div>
-    <div class="fb-stat">
-        <span class="fb-stat-n"><?= $conAcuerdos ?></span>
-        <span class="fb-stat-l">Con objetivos SMART</span>
+    <?php endif; ?>
+
+    <?php if ($fl3Total > 0): ?>
+    <!-- FL3 · Experiencia Azul -->
+    <div class="fb-flow-card" style="--ffc:#0891b2">
+        <div class="fb-ffc-label"><span class="fb-ffc-dot"></span>Experiencia Azul</div>
+        <div class="fb-ffc-grid">
+            <div><div class="fb-ffc-n"><?= $fl3Total ?></div><div class="fb-ffc-l">Asistenciales</div></div>
+            <div><div class="fb-ffc-n"><?= $fl3Feedback ?></div><div class="fb-ffc-l">Con feedback</div></div>
+            <div><div class="fb-ffc-n"><?= $fl3Obj ?></div><div class="fb-ffc-l">Con objetivos</div></div>
+            <div><div class="fb-ffc-n"><?= $fl3Firmados ?></div><div class="fb-ffc-l">Firmados</div></div>
+        </div>
+        <div class="fb-ffc-prog-wrap"><div class="fb-ffc-prog-bar" style="width:<?= $fl3Pct ?>%"></div></div>
+        <div class="fb-ffc-pct"><?= $fl3Pct ?>% firmado</div>
     </div>
-    <div class="fb-stat">
-        <span class="fb-stat-n"><?= $completos ?></span>
-        <span class="fb-stat-l">Proceso completo</span>
-    </div>
+    <?php endif; ?>
+
 </div>
 
+<?php if ($periodoVencido): ?>
+<div class="fb-fade fb-d3" style="background:linear-gradient(135deg,#fef2f2,#fee2e2);
+     border:1.5px solid #fca5a5;border-radius:14px;padding:14px 20px;
+     display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+    <span style="color:#dc2626;flex-shrink:0;"><?= icon('calendar-x', 22) ?></span>
+    <div>
+        <div style="font-size:.82rem;font-weight:700;color:#991b1b;letter-spacing:.5px;text-transform:uppercase;">
+            Per&iacute;odo cerrado
+        </div>
+        <div style="font-size:.84rem;color:#7f1d1d;margin-top:2px;">
+            El per&iacute;odo venci&oacute; el <strong><?= htmlspecialchars($periodoActivo['FECHACIERRE']) ?></strong>.
+            Solo se puede consultar el historial &mdash; no se pueden registrar nuevas acciones.
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- ── TABLA EQUIPO ── -->
-<div class="fb-card fb-fade fb-d3">
-    <div class="fb-card-head">
+<?php
+$fl1Total       = count($equipo ?? []);
+$fl1Completados = count(array_filter($equipo ?? [], fn($c) => ($c['FIRMADO_COLAB'] ?? 0) > 0));
+$fl1ProgBg      = $fl1Completados === $fl1Total && $fl1Total > 0 ? '#dcfce7' : '#dbeafe';
+$fl1ProgColor   = $fl1Completados === $fl1Total && $fl1Total > 0 ? '#166534' : '#1e40af';
+?>
+<div id="fb-card-fl1" class="fb-card fb-fade fb-d3">
+    <div class="fb-card-head" onclick="fbToggleAcc('fb-body-fl1','fb-chev-fl1')"
+         style="display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:36px;height:36px;border-radius:10px;
                         background:linear-gradient(135deg,#0058af,#0074e0);
@@ -419,12 +586,19 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
             <div>
                 <div class="fb-card-title">Mi equipo — Retroalimentación del período</div>
                 <div style="font-size:11px;color:var(--fb-muted);">
-                    Proceso 1 · Competencias P1-P11 · Máx. <?= $maxObjetivos ?> objetivos SMART por colaborador
+                    Competencias generales · Máx. <?= $maxObjetivos ?> objetivos SMART por colaborador
                 </div>
             </div>
         </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="fb-prog-badge" style="background:<?= $fl1ProgBg ?>;color:<?= $fl1ProgColor ?>;">
+                <?= $fl1Completados ?>/<?= $fl1Total ?> completados
+            </span>
+            <div id="fb-chev-fl1" class="fb-acc-chevron"><?= icon('chevron-down', 16) ?></div>
+        </div>
     </div>
 
+    <div id="fb-body-fl1" class="fb-acc-body">
     <?php if (empty($equipo)): ?>
     <div style="text-align:center;padding:48px;color:var(--fb-muted);">
         <div style="font-size:32px;margin-bottom:10px;">·</div>
@@ -493,60 +667,64 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
             </td>
             <td style="text-align:center;">
                 <?php
-                $puedeIniciarFeedback = $col['TIENE_AUTO'] && $col['TIENE_EVAL_COLAB'];
-                $yaTieneFeedback      = $col['TIENE_FEEDBACK'];
-                // Si ya tiene feedback registrado, siempre puede editar
-                // Si no, solo puede iniciar si ambas evaluaciones están completas
-                $btnHabilitado = $yaTieneFeedback || $puedeIniciarFeedback;
+                $yaTieneFeedback = $col['TIENE_FEEDBACK'];
+                // El líder siempre puede iniciar feedback, tenga o no autoevaluación el colaborador
+                $btnHabilitado   = true;
                 ?>
-                <?php if ($btnHabilitado): ?>
                 <?php $firmaColab = (int)($col['FIRMADO_COLAB'] ?? 0); ?>
-                <button class="fb-btn <?= $firmaColab ? 'fb-btn-outline' : 'fb-btn-primary' ?> fb-btn-sm"
-                    onclick="abrirModalFeedback(
-                        <?= $col['IDEMPLEADO'] ?>,
-                        '<?= addslashes(htmlspecialchars($col['EMPLEADO'])) ?>',
-                        '<?= addslashes(htmlspecialchars($col['CARGO'])) ?>',
-                        <?= $col['TIENE_FEEDBACK'] ? 1 : 0 ?>,
-                        <?= $col['IDFEEDBACK'] ?: 'null' ?>,
-                        '<?= $col['FECHA_FEEDBACK'] ?: '' ?>',
-                        '<?= addslashes($col['OBSERVACION'] ?: '') ?>',
-                        <?= $col['TOTAL_ACUERDOS'] ?>,
-                        <?= $firmaColab ?>
-                    )">
-                    <?php if ($firmaColab): ?>
-                        <?= icon('check-circle', 14) ?> Firmado
-                    <?php elseif ($yaTieneFeedback): ?>
-                        <?= icon('pen', 14) ?> Editar
-                    <?php else: ?>
-                        <?= icon('message-circle', 14) ?> Registrar
+                <?php $fl1Completado = $firmaColab && $total > 0 && $aprobados >= $total; ?>
+                <div style="display:flex;gap:5px;justify-content:center;align-items:center;flex-wrap:wrap;">
+                    <!-- Botón ver datos consolidados -->
+                    <?php if ($col['TIENE_EVAL_COLAB']): ?>
+                    <button onclick="abrirConsolidado(<?= $col['IDEMPLEADO'] ?>, '<?= addslashes(htmlspecialchars($col['EMPLEADO'])) ?>')"
+                            style="padding:5px 11px;border:1.5px solid #bfdbfe;border-radius:7px;
+                                   background:linear-gradient(135deg,#eff6ff,#dbeafe);
+                                   color:#1d4ed8;font-size:.72rem;font-weight:600;cursor:pointer;
+                                   display:flex;align-items:center;gap:5px;
+                                   transition:box-shadow .15s;white-space:nowrap;"
+                            onmouseover="this.style.boxShadow='0 2px 8px rgba(37,99,235,.2)'"
+                            onmouseout="this.style.boxShadow='none'">
+                        <?= icon('eye', 13) ?> Ver datos
+                    </button>
                     <?php endif; ?>
-                </button>
-                <?php else: ?>
-                <?php
-                // Construir mensaje indicando qué falta
-                $faltaMsg = [];
-                if (!$col['TIENE_AUTO'])       $faltaMsg[] = 'autoevaluación';
-                if (!$col['TIENE_EVAL_COLAB']) $faltaMsg[] = 'evaluación del líder';
-                $tooltip = 'Falta: ' . implode(' y ', $faltaMsg);
-                ?>
-                <div title="<?= htmlspecialchars($tooltip) ?>"
-                     style="display:inline-block;">
-                    <button class="fb-btn fb-btn-sm"
-                            disabled
-                            style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;border:1px dashed #cbd5e1;">
-                        · Pendiente
+                    <!-- Botón feedback -->
+                    <?php $pendFirmaFL1 = $yaTieneFeedback && $total >= $maxObjetivos && !$firmaColab && !$fl1Completado; ?>
+                    <button class="fb-btn <?= $fl1Completado ? 'fb-btn-outline' : ($firmaColab ? 'fb-btn-seguimiento' : ($pendFirmaFL1 ? '' : 'fb-btn-primary')) ?> fb-btn-sm"
+                        style="<?php
+                            if ($fl1Completado)   echo 'background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;';
+                            elseif ($pendFirmaFL1) echo 'background:#fff7ed;color:#d97706;border:1.5px solid #fed7aa;';
+                        ?>"
+                        onclick="abrirModalFeedback(
+                            <?= $col['IDEMPLEADO'] ?>,
+                            '<?= addslashes(htmlspecialchars($col['EMPLEADO'])) ?>',
+                            '<?= addslashes(htmlspecialchars($col['CARGO'])) ?>',
+                            <?= $col['TIENE_FEEDBACK'] ? 1 : 0 ?>,
+                            <?= $col['IDFEEDBACK'] ?: 'null' ?>,
+                            '<?= $col['FECHA_FEEDBACK'] ?: '' ?>',
+                            '<?= addslashes($col['OBSERVACION'] ?: '') ?>',
+                            <?= $col['TOTAL_ACUERDOS'] ?>,
+                            <?= $firmaColab ?>
+                        )">
+                        <?php if ($fl1Completado): ?>
+                            <?= icon('star', 14) ?> Completado
+                        <?php elseif ($firmaColab): ?>
+                            Ver seguimiento ✓
+                        <?php elseif ($pendFirmaFL1): ?>
+                            <?= icon('pen', 14) ?> Pendiente firmar
+                        <?php elseif ($yaTieneFeedback): ?>
+                            <?= icon('plus', 14) ?> Asignar Objetivos
+                        <?php else: ?>
+                            <?= icon('message-circle', 14) ?> Registrar feedback
+                        <?php endif; ?>
                     </button>
                 </div>
-                <div style="font-size:10px;color:#f59e0b;margin-top:3px;max-width:110px;line-height:1.3;">
-                    <?= htmlspecialchars($tooltip) ?>
-                </div>
-                <?php endif; ?>
             </td>
         </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
     <?php endif; ?>
+    </div><!-- /fb-acc-body fl1 -->
 </div>
 
 <?php endif; // fin periodoActivo ?>
@@ -554,26 +732,38 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
 
 
 <?php if (!empty($lideresACargo)): ?>
+<?php
+$fl2Total       = count($lideresACargo);
+$fl2Completados = count(array_filter($lideresACargo, fn($l) => ($l['FIRMADO_COLAB'] ?? 0) > 0));
+$fl2ProgBg      = $fl2Completados === $fl2Total && $fl2Total > 0 ? '#dcfce7' : '#dbeafe';
+$fl2ProgColor   = $fl2Completados === $fl2Total && $fl2Total > 0 ? '#166534' : '#1e40af';
+?>
 <!-- ── TABLA LÍDERES A CARGO (Flujo 2 — solo directores) ── -->
-<div class="fb-card fb-fade fb-d3" style="margin-top:24px;">
-    <div class="fb-card-head">
+<div id="fb-card-fl2" class="fb-card fb-fade fb-d3" style="margin-top:24px;">
+    <div class="fb-card-head" onclick="fbToggleAcc('fb-body-fl2','fb-chev-fl2')"
+         style="display:flex;align-items:center;justify-content:space-between;">
         <div style="display:flex;align-items:center;gap:10px;">
             <div style="width:36px;height:36px;border-radius:10px;
                         background:linear-gradient(135deg,#0058af,#0074e0);
                         display:flex;align-items:center;justify-content:center;">
-                <span style="color:#fff;"><!-- forzamos icono blanco aunque el tema sea oscuro -->
-                    <?= icon('users', 18) ?>
-                 </span>
+                <span style="color:#fff;"><?= icon('users', 18) ?></span>
             </div>
             <div>
                 <div class="fb-card-title">Feedback a Líderes — Competencias de Liderazgo</div>
                 <div style="font-size:11px;color:var(--fb-muted);">
-                    Basado en calificaciones promediadas P12-P16 recibidas de sus colaboradores
+                    Basado en la calificación recibida de sus colaboradores · Máx. <?= $maxObjetivos ?> objetivos SMART por líder
                 </div>
             </div>
         </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="fb-prog-badge" style="background:<?= $fl2ProgBg ?>;color:<?= $fl2ProgColor ?>;">
+                <?= $fl2Completados ?>/<?= $fl2Total ?> completados
+            </span>
+            <div id="fb-chev-fl2" class="fb-acc-chevron"><?= icon('chevron-down', 16) ?></div>
+        </div>
     </div>
 
+    <div id="fb-body-fl2" class="fb-acc-body">
     <table class="fb-table">
         <thead>
             <tr>
@@ -587,11 +777,12 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
         <tbody>
         <?php foreach ($lideresACargo as $lid): ?>
         <?php
-        $tieneFbL2   = ($lid['IDFEEDBACK'] ?? 0) > 0;
-        $firmadoL2   = ($lid['FIRMADO_COLAB'] ?? 0) > 0;
-        $objL2       = (int)($lid['TOTAL_OBJETIVOS_L2'] ?? 0);
-        $tieneEvalL2 = $lid['TIENE_EVAL'] > 0;
-        $maxObj      = $maxObjetivos ?? 3;
+        $tieneFbL2    = ($lid['IDFEEDBACK'] ?? 0) > 0;
+        $firmadoL2    = ($lid['FIRMADO_COLAB'] ?? 0) > 0;
+        $objL2        = (int)($lid['TOTAL_OBJETIVOS_L2'] ?? 0);
+        $aprobadosL2  = (int)($lid['ACUERDOS_APROBADOS_L2'] ?? 0);
+        $tieneEvalL2  = $lid['TIENE_EVAL'] > 0;
+        $maxObj       = $maxObjetivos ?? 3;
         ?>
         <tr>
             <td>
@@ -607,10 +798,16 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
             </td>
             <td style="text-align:center;">
                 <?php if ($tieneFbL2): ?>
+                    <?php
+                    $l2Partes = explode(' ', $lid['FECHA_FEEDBACK_L2'] ?? '');
+                    $l2Fecha  = $l2Partes[0] ?? '';
+                    $l2Hora   = $l2Partes[1] ?? '';
+                    ?>
                     <span class="fb-badge fb-badge-done"><?= icon('check-circle', 14) ?> Registrado</span>
-                    <?php if (!empty($lid['FECHA_FEEDBACK_L2'])): ?>
+                    <?php if ($l2Fecha): ?>
                     <div style="font-size:10px;color:var(--fb-muted);margin-top:3px;">
-                        · <?= htmlspecialchars(explode(' ', $lid['FECHA_FEEDBACK_L2'])[0] ?? '') ?>
+                        · <?= htmlspecialchars($l2Fecha) ?>
+                        <?php if ($l2Hora): ?>&nbsp;· <?= htmlspecialchars($l2Hora) ?><?php endif; ?>
                     </div>
                     <?php endif; ?>
                 <?php else: ?>
@@ -625,39 +822,215 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
                 <?php endif; ?>
             </td>
             <td style="text-align:center;">
+                <div style="display:flex;gap:5px;justify-content:center;align-items:center;flex-wrap:wrap;">
                 <?php if (!$tieneEvalL2): ?>
                     <button class="fb-btn fb-btn-sm" disabled
                             style="background:#f1f5f9;color:#94a3b8;border:1px dashed #cbd5e1;cursor:not-allowed;">
                         Sin evaluaciones
                     </button>
-                <?php elseif ($firmadoL2): ?>
-                    <button class="fb-btn fb-btn-outline fb-btn-sm"
-                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>, true)">
-                        <?= icon('check-circle', 14) ?> Firmado
+                <?php else: ?>
+                    <!-- Botón ver datos consolidados Flujo 2 -->
+                    <button onclick="abrirConsolidadoL2(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes(htmlspecialchars($lid['NOMBRE'])) ?>')"
+                            style="padding:5px 11px;border:1.5px solid #bfdbfe;border-radius:7px;
+                                   background:linear-gradient(135deg,#eff6ff,#dbeafe);
+                                   color:#1d4ed8;font-size:.72rem;font-weight:600;cursor:pointer;
+                                   display:flex;align-items:center;gap:5px;white-space:nowrap;"
+                            onmouseover="this.style.boxShadow='0 2px 8px rgba(37,99,235,.2)'"
+                            onmouseout="this.style.boxShadow='none'">
+                        <?= icon('eye', 13) ?> Ver datos
                     </button>
-                <?php elseif ($tieneFbL2 && $objL2 >= $maxObj): ?>
+                    <?php if ($firmadoL2): ?>
+                    <?php $fl2Completado = $objL2 > 0 && $aprobadosL2 >= $objL2; ?>
+                    <button class="fb-btn <?= $fl2Completado ? 'fb-btn-outline' : 'fb-btn-seguimiento' ?> fb-btn-sm"
+                            <?php if ($fl2Completado): ?>style="background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;"<?php endif; ?>
+                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>, true, '<?= addslashes($lid['FECHA_FEEDBACK_L2'] ?? '') ?>', '<?= addslashes($lid['OBSERVACION_L2'] ?? '') ?>', 1)">
+                        <?php if ($fl2Completado): ?>
+                            <?= icon('star', 14) ?> Completado
+                        <?php else: ?>
+                            Ver seguimiento ✓
+                        <?php endif; ?>
+                    </button>
+                    <?php elseif ($tieneFbL2 && $objL2 >= $maxObj): ?>
                     <button class="fb-btn fb-btn-sm"
-                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>, true)"
+                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>, true, '<?= addslashes($lid['FECHA_FEEDBACK_L2'] ?? '') ?>', '<?= addslashes($lid['OBSERVACION_L2'] ?? '') ?>', 0)"
                             style="background:#fff7ed;color:#d97706;border:1.5px solid #fed7aa;">
                         <?= icon('pen', 14) ?> Pendiente firmar
                     </button>
-                <?php elseif ($tieneFbL2): ?>
+                    <?php elseif ($tieneFbL2): ?>
                     <button class="fb-btn fb-btn-primary fb-btn-sm"
-                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>)">
+                            onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', <?= $lid['IDFEEDBACK'] ?>, false, '<?= addslashes($lid['FECHA_FEEDBACK_L2'] ?? '') ?>', '<?= addslashes($lid['OBSERVACION_L2'] ?? '') ?>', 0)">
                         <?= icon('plus', 14) ?> Asignar objetivos
                     </button>
-                <?php else: ?>
+                    <?php else: ?>
                     <button class="fb-btn fb-btn-primary fb-btn-sm"
                             onclick="abrirFeedbackLider(<?= $lid['IDEMPLEADO'] ?>, '<?= addslashes($lid['NOMBRE']) ?>', '<?= addslashes($lid['CARGO']) ?>', 0)"
                             style="background:linear-gradient(135deg,#0058af,#0074e0);">
-                        <?= icon('message-circle', 14) ?> Registrar Feedback
+                        <?= icon('message-circle', 14) ?> Registrar feedback
                     </button>
+                    <?php endif; ?>
                 <?php endif; ?>
+                </div>
             </td>
         </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div><!-- /fb-acc-body fl2 -->
+</div>
+<?php endif; ?>
+
+<?php if (!empty($equipoEA)): ?>
+<?php
+$fl3Total       = count($equipoEA);
+$fl3Completados = count(array_filter($equipoEA, fn($e) => ($e['FIRMADO_COLAB_EA'] ?? 0) > 0));
+$fl3ProgBg      = $fl3Completados === $fl3Total && $fl3Total > 0 ? '#dcfce7' : '#cffafe';
+$fl3ProgColor   = $fl3Completados === $fl3Total && $fl3Total > 0 ? '#166534' : '#0e7490';
+?>
+<!-- ── TABLA EQUIPO EA (Flujo 3 — Experiencia Azul Colaborador) ── -->
+<div id="fb-card-ea" class="fb-card fb-fade fb-d3" style="margin-top:24px;border-top:3px solid #0891b2;">
+    <div class="fb-card-head" onclick="fbToggleAcc('fb-body-ea','fb-chev-ea')"
+         style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);
+                display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:40px;height:40px;border-radius:12px;
+                        background:linear-gradient(135deg,#0891b2,#06b6d4);
+                        display:flex;align-items:center;justify-content:center;
+                        box-shadow:0 3px 10px rgba(8,145,178,0.35);color:#fff;">
+                <?= icon('star', 20) ?>
+            </div>
+            <div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="fb-card-title" style="color:#0c4a6e;">Experiencia Azul</div>
+                </div>
+                <div style="font-size:11px;color:#0369a1;">
+                    Retroalimentación al colaborador asistencial · Máx. <?= $maxObjetivos ?> objetivos SMART por colaborador
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span class="fb-prog-badge" style="background:<?= $fl3ProgBg ?>;color:<?= $fl3ProgColor ?>;">
+                <?= $fl3Completados ?>/<?= $fl3Total ?> completados
+            </span>
+            <div id="fb-chev-ea" class="fb-acc-chevron" style="color:#0891b2;background:rgba(8,145,178,.1);">
+                <?= icon('chevron-down', 16) ?>
+            </div>
+        </div>
+    </div>
+
+    <div id="fb-body-ea" class="fb-acc-body">
+    <table class="fb-table">
+        <thead>
+            <tr>
+                <th>Colaborador</th>
+                <th style="text-align:center;">Evaluado por líder EA</th>
+                <th style="text-align:center;">Feedback EA</th>
+                <th style="text-align:center;">Objetivos SMART</th>
+                <th style="text-align:center;">Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($equipoEA as $ea): ?>
+        <?php
+        $tieneFbEA       = (int)($ea['TIENE_FEEDBACK_EA']     ?? 0);
+        $totalEAObj      = (int)($ea['TOTAL_ACUERDOS_EA']     ?? 0);
+        $aprobadosEA     = (int)($ea['ACUERDOS_APROBADOS_EA'] ?? 0);
+        $firmadoEA       = (int)($ea['FIRMADO_COLAB_EA']      ?? 0);
+        $puedeIniciarEA  = (bool)$ea['TIENE_EVAL_EA'];
+        $btnEAHabilitado = $tieneFbEA || $puedeIniciarEA;
+        ?>
+        <tr>
+            <td>
+                <div class="fb-emp-name"><?= htmlspecialchars($ea['EMPLEADO']) ?></div>
+                <div class="fb-emp-cargo"><?= htmlspecialchars($ea['CARGO']) ?></div>
+            </td>
+            <td style="text-align:center;">
+                <span class="fb-badge <?= $ea['TIENE_EVAL_EA'] ? 'fb-badge-done' : 'fb-badge-none' ?>">
+                    <?= $ea['TIENE_EVAL_EA'] ? (icon('check-circle', 14) . ' Sí') : (icon('clock', 14) . ' No') ?>
+                </span>
+            </td>
+            <td style="text-align:center;">
+                <?php if ($tieneFbEA): ?>
+                <?php
+                $eaFbPartes = explode(' ', $ea['FECHA_FEEDBACK'] ?? '');
+                ?>
+                <div>
+                    <span class="fb-badge fb-badge-done">✓ Registrado</span>
+                    <div style="font-size:10px;color:var(--fb-muted);margin-top:3px;">
+                        · <?= $eaFbPartes[0] ?? '' ?>
+                        <?php if (!empty($eaFbPartes[1])): ?>&nbsp;· <?= $eaFbPartes[1] ?><?php endif; ?>
+                    </div>
+                </div>
+                <?php else: ?>
+                <span class="fb-badge fb-badge-pending">· Pendiente</span>
+                <?php endif; ?>
+            </td>
+            <td style="text-align:center;">
+                <?php if ($totalEAObj > 0): ?>
+                <span class="fb-badge fb-badge-info"><?= $totalEAObj ?>/<?= $maxObjetivos ?> asignados</span>
+                <?php else: ?>
+                <span class="fb-badge fb-badge-none">Sin asignar</span>
+                <?php endif; ?>
+            </td>
+            <td style="text-align:center;">
+                <div style="display:flex;gap:5px;justify-content:center;align-items:center;flex-wrap:wrap;">
+                <?php if ($ea['TIENE_EVAL_EA']): ?>
+                <!-- Botón ver datos consolidados Flujo 3 EA -->
+                <button onclick="abrirConsolidadoEA(<?= (int)$ea['IDEMPLEADO'] ?>, '<?= addslashes(htmlspecialchars($ea['EMPLEADO'])) ?>')"
+                        style="padding:5px 11px;border:1.5px solid #bfdbfe;border-radius:7px;
+                               background:linear-gradient(135deg,#eff6ff,#dbeafe);
+                               color:#1d4ed8;font-size:.72rem;font-weight:600;cursor:pointer;
+                               display:flex;align-items:center;gap:5px;white-space:nowrap;"
+                        onmouseover="this.style.boxShadow='0 2px 8px rgba(37,99,235,.2)'"
+                        onmouseout="this.style.boxShadow='none'">
+                    <?= icon('eye', 13) ?> Ver datos
+                </button>
+                <?php endif; ?>
+                <?php if ($btnEAHabilitado): ?>
+                <?php $eaCompletado = $firmadoEA && $totalEAObj > 0 && $aprobadosEA >= $totalEAObj; ?>
+                <button class="fb-btn fb-btn-sm
+                    <?= $eaCompletado ? 'fb-btn-outline' : ($firmadoEA ? 'fb-btn-seguimiento' : ($tieneFbEA && $totalEAObj >= $maxObjetivos ? '' : ($tieneFbEA ? 'fb-btn-primary' : 'fb-btn-primary'))) ?>"
+                    onclick="abrirModalEA(
+                        <?= (int)$ea['IDEMPLEADO'] ?>,
+                        '<?= addslashes(htmlspecialchars($ea['EMPLEADO'])) ?>',
+                        '<?= addslashes(htmlspecialchars($ea['CARGO'])) ?>',
+                        <?= $tieneFbEA ?>,
+                        <?= $ea['IDFEEDBACK'] ?: 'null' ?>,
+                        '<?= $ea['FECHA_FEEDBACK'] ?: '' ?>',
+                        '<?= addslashes($ea['OBSERVACION'] ?: '') ?>',
+                        <?= $totalEAObj ?>,
+                        <?= $firmadoEA ?>
+                    )"
+                    <?php if ($eaCompletado): ?>style="background:#f0fdf4;color:#15803d;border:1.5px solid #86efac;"<?php elseif ($tieneFbEA && $totalEAObj >= $maxObjetivos && !$firmadoEA): ?>style="background:#fff7ed;color:#d97706;border:1.5px solid #fed7aa;"<?php endif; ?>>
+                    <?php if ($eaCompletado): ?>
+                        <?= icon('star', 14) ?> Completado
+                    <?php elseif ($firmadoEA): ?>
+                        Ver seguimiento ✓
+                    <?php elseif ($tieneFbEA && $totalEAObj >= $maxObjetivos): ?>
+                        <?= icon('pen', 14) ?> Pendiente firma
+                    <?php elseif ($tieneFbEA): ?>
+                        <?= icon('plus', 14) ?> Asignar objetivos
+                    <?php else: ?>
+                        <?= icon('message-circle', 14) ?> Registrar feedback
+                    <?php endif; ?>
+                </button>
+                <?php else: ?>
+                <div title="Falta: tu evaluación EA del colaborador">
+                    <button class="fb-btn fb-btn-sm" disabled
+                            style="background:#f1f5f9;color:#94a3b8;cursor:not-allowed;border:1px dashed #cbd5e1;">
+                        · Pendiente
+                    </button>
+                </div>
+                <div style="font-size:10px;color:#f59e0b;margin-top:3px;max-width:120px;line-height:1.3;">
+                    Completa la evaluación EA del colaborador
+                </div>
+                <?php endif; ?>
+                </div><!-- flex wrapper FL3 -->
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div><!-- /fb-acc-body ea -->
 </div>
 <?php endif; ?>
 
@@ -723,6 +1096,13 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
                 </div>
                 <div id="fl2NombreLider" style="font-size:1.1rem;font-weight:800;color:#fff;line-height:1.2;"></div>
                 <div id="fl2CargoLider" style="font-size:.78rem;color:rgba(255,255,255,.6);margin-top:3px;"></div>
+                <button id="fl2BtnEditarAgend" onclick="fl2IrPasoFeedback()"
+                        style="display:none;margin-top:8px;background:rgba(255,255,255,.15);
+                               border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;
+                               padding:4px 12px;font-size:.72rem;font-weight:600;cursor:pointer;
+                               letter-spacing:.3px;">
+                    &#9998; Editar agendamiento
+                </button>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
                 <span id="fl2CounterPill" class="fl2-counter-pill">0 / 3 obj.</span>
@@ -943,7 +1323,7 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
         <!-- Fila superior: info + pill + cerrar -->
         <div class="fb-modal-header-top">
             <div style="position:relative;">
-                <div class="fb-modal-eyebrow">Proceso 1 &mdash; Retroalimentación P1-P11</div>
+                <div class="fb-modal-eyebrow">Retroalimentación — Competencias Generales</div>
                 <div class="fb-modal-title" id="fbModalTitle">Colaborador</div>
                 <div class="fb-modal-sub"   id="fbModalSub">Cargo</div>
             </div>
@@ -1023,7 +1403,7 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
             <div style="font-size:12px;color:var(--fb-muted);margin-bottom:12px;">
                 Basado en las calificaciones de la evaluación del período actual.
             </div>
-            <div id="fbCompGrid" class="fb-comp-grid">
+            <div id="fbCompGrid" style="margin-bottom:14px;">
                 <div class="fb-loading">
                     <div class="fb-loading-spin"></div>
                     Cargando calificaciones...
@@ -1048,30 +1428,30 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
                 <div class="fb-section-label" style="margin-bottom:10px;">Completa los campos del acuerdo</div>
                 <div class="fb-input-full">
                     <label class="fb-label">Indicador</label>
-                    <input type="text" id="fbIndicadorAjuste" class="fb-input" placeholder="">
+                    <input type="text" id="fbIndicadorAjuste" class="fb-input" placeholder="" readonly style="background:#f8fafc;cursor:default;color:#475569;">
                 </div>
                 <div class="fb-input-row">
                     <div>
                         <label class="fb-label">Meta</label>
-                        <input type="text" id="fbMetaAjuste" class="fb-input" placeholder="">
+                        <input type="text" id="fbMetaAjuste" class="fb-input" placeholder="" readonly style="background:#f8fafc;cursor:default;color:#475569;">
                     </div>
                     <div>
                         <label class="fb-label">Plazo</label>
-                        <input type="text" id="fbPlazoAjuste" class="fb-input" placeholder="">
+                        <input type="text" id="fbPlazoAjuste" class="fb-input" placeholder="" readonly style="background:#f8fafc;cursor:default;color:#475569;">
                     </div>
                 </div>
                 <div class="fb-input-full">
                     <label class="fb-label">Evidencia</label>
-                    <input type="text" id="fbEvidencia" class="fb-input" placeholder="">
+                    <input type="text" id="fbEvidencia" class="fb-input" placeholder="" readonly style="background:#f8fafc;cursor:default;color:#475569;">
                 </div>
                 <div class="fb-input-full">
                     <label class="fb-label">Apoyo del líder</label>
                     <textarea id="fbApoyo" class="fb-textarea" rows="2"
-                        placeholder="¿Qué apoyo o recursos proveerás al colaborador?"></textarea>
+                        placeholder="Define el acompañamiento, formación, recursos, autoridad o espacio de seguimiento que debes aportar para viabilizar este compromiso."></textarea>
                 </div>
                 <div class="fb-input-full">
                     <label class="fb-label">Seguimiento sugerido</label>
-                    <input type="text" id="fbSeguimiento" class="fb-input" placeholder="">
+                    <input type="text" id="fbSeguimiento" class="fb-input" placeholder="" readonly style="background:#f8fafc;cursor:default;color:#475569;">
                 </div>
                 <div class="fb-input-full">
                     <label class="fb-label">Compromiso final ajustado</label>
@@ -1171,7 +1551,7 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
 
     </div>
     <div class="fb-modal-footer" id="fbModalFooter">
-        <button class="fb-btn fb-btn-outline" onclick="fbState.paso === 4 ? location.reload() : cerrarModal()">Cancelar</button>
+        <button id="fbBtnCancelar" class="fb-btn fb-btn-outline" onclick="fbState.paso === 4 ? location.reload() : cerrarModal()">Cancelar</button>
         <button class="fb-btn fb-btn-primary" id="fbBtnAccion" onclick="accionModal()">
             Guardar feedback →
         </button>
@@ -1181,13 +1561,107 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
 
 
 
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<!-- ══ MODAL CONSOLIDADO — Vista previa calificaciones ══ -->
+<div id="fbConsolidadoOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+     z-index:9800;align-items:center;justify-content:center;padding:16px;">
+<div style="background:#fff;border-radius:20px;width:min(700px,98vw);max-height:90vh;
+            overflow:hidden;display:flex;flex-direction:column;
+            box-shadow:0 24px 64px rgba(0,88,175,.25);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#0f172a,#1e3a5f);
+                padding:20px 24px 16px;flex-shrink:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <div>
+                <div id="fbConsSubtitle" style="font-size:.65rem;letter-spacing:2px;text-transform:uppercase;
+                            color:rgba(255,255,255,.5);margin-bottom:5px;">
+                    Consolidado de evaluación — Flujo 1 · P1 a P11
+                </div>
+                <div id="fbConsNombre" style="font-size:1rem;font-weight:700;color:#fff;"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span id="fbConsAutoBadge" style="display:none;font-size:.7rem;font-weight:600;
+                    padding:3px 10px;border-radius:20px;
+                    background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25);">
+                    Con autoevaluación
+                </span>
+                <button onclick="cerrarConsolidado()"
+                        style="background:rgba(255,255,255,.12);border:none;color:#fff;
+                               width:30px;height:30px;border-radius:50%;font-size:1rem;
+                               cursor:pointer;line-height:1;">&#215;</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div style="display:flex;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;">
+        <button id="fbConsTabDatos" onclick="consShowTab('datos')"
+                style="flex:1;padding:9px 16px;border:none;background:none;cursor:pointer;
+                       font-size:.78rem;font-weight:700;color:#0058af;font-family:inherit;
+                       border-bottom:2px solid #0058af;transition:all .15s;
+                       display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+            Datos
+        </button>
+        <button id="fbConsTabGrafica" onclick="consShowTab('grafica')"
+                style="flex:1;padding:9px 16px;border:none;background:none;cursor:pointer;
+                       font-size:.78rem;font-weight:700;color:#94a3b8;font-family:inherit;
+                       border-bottom:2px solid transparent;transition:all .15s;
+                       display:flex;align-items:center;justify-content:center;gap:6px;">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Gráfica
+        </button>
+    </div>
+
+    <!-- Leyenda columnas (tab Datos) -->
+    <div id="fbConsLeyenda" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;
+                flex-shrink:0;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
+        <div style="padding:8px 16px;font-size:.72rem;font-weight:700;color:#64748b;
+                    text-transform:uppercase;letter-spacing:.05em;">Competencia</div>
+        <div id="fbConsCol2" style="padding:8px 16px;font-size:.72rem;font-weight:700;color:#0058af;
+                    text-transform:uppercase;letter-spacing:.05em;border-left:1px solid #e2e8f0;">
+            Tu evaluación
+        </div>
+        <div id="fbConsAutoCol" style="padding:8px 16px;font-size:.72rem;font-weight:700;color:#7c3aed;
+                    text-transform:uppercase;letter-spacing:.05em;border-left:1px solid #e2e8f0;">
+            Autoevaluación
+        </div>
+    </div>
+
+    <!-- Body scrollable (tab Datos) -->
+    <div id="fbConsBody" style="overflow-y:auto;flex:1;padding:0;">
+        <div style="text-align:center;padding:48px;color:#94a3b8;font-size:.85rem;">
+            Cargando datos...
+        </div>
+    </div>
+
+    <!-- Canvas gráfica (tab Gráfica, oculto por defecto) -->
+    <div id="fbConsChartWrap" style="display:none;flex:1;overflow-y:auto;padding:24px 28px;">
+        <canvas id="fbConsChart"></canvas>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:14px 24px;border-top:1px solid #f1f5f9;flex-shrink:0;
+                display:flex;justify-content:flex-end;">
+        <button onclick="cerrarConsolidado()"
+                style="padding:8px 22px;border:1.5px solid #e2e8f0;border-radius:9px;
+                       background:#fff;color:#64748b;font-size:.83rem;font-weight:600;cursor:pointer;">
+            Cerrar
+        </button>
+    </div>
+</div>
+</div>
+
 <!-- Mini-modal seguimiento -->
 <div id="fbSeguimientoModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
      z-index:9999;align-items:center;justify-content:center;">
     <div style="background:#fff;border-radius:14px;padding:24px;width:min(480px,95vw);
                 box-shadow:0 20px 60px rgba(0,0,0,.3);">
-        <div style="font-weight:700;font-size:.95rem;color:#1e3a5f;margin-bottom:4px;" id="fbSegCompNombre"></div>
-        <div style="font-size:.78rem;color:#64748b;margin-bottom:14px;" id="fbSegObjTexto"></div>
+        <div style="font-weight:700;font-size:.95rem;color:#1e3a5f;margin-bottom:14px;" id="fbSegCompNombre"></div>
+        <div style="display:none;" id="fbSegObjTexto"></div>
         <label style="font-size:.75rem;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Estado</label>
         <select id="fbSegEstado" style="width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;
                 border-radius:8px;font-size:.85rem;margin-bottom:12px;outline:none;">
@@ -1210,10 +1684,281 @@ $completos    = count(array_filter($equipo, fn($c) => $c['TIENE_FEEDBACK'] == 1 
 </div>
 
 
+<!-- ══════════════════════════════════
+     MODAL FLUJO 3 — Experiencia Azul
+══════════════════════════════════ -->
+<div id="fbEAModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,40,.75);
+     z-index:9000;align-items:center;justify-content:center;padding:16px;">
+<div style="background:#fff;border-radius:22px;width:min(740px,98vw);max-height:92vh;
+            overflow:hidden;display:flex;flex-direction:column;
+            box-shadow:0 32px 80px rgba(0,88,175,.3);">
+
+    <!-- Header teal — identidad Experiencia Azul -->
+    <div style="background:linear-gradient(135deg,#0c4a6e 0%,#0891b2 55%,#06b6d4 100%);
+                padding:24px 28px 18px;flex-shrink:0;position:relative;overflow:hidden;">
+        <div style="position:absolute;width:260px;height:260px;border-radius:50%;
+                    background:rgba(255,255,255,.06);top:-80px;right:-50px;pointer-events:none;"></div>
+        <div style="position:absolute;width:140px;height:140px;border-radius:50%;
+                    background:rgba(255,255,255,.04);bottom:-40px;left:30px;pointer-events:none;"></div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;position:relative;">
+            <div>
+                <div style="font-size:.65rem;letter-spacing:2px;text-transform:uppercase;
+                            color:rgba(255,255,255,.55);margin-bottom:6px;">
+                    Retroalimentaci&oacute;n EA &mdash; Competencias P17 a P22
+                </div>
+                <div id="fbEANombre" style="font-size:1.1rem;font-weight:800;color:#fff;line-height:1.2;"></div>
+                <div id="fbEACargo"  style="font-size:.78rem;color:rgba(255,255,255,.6);margin-top:3px;"></div>
+                <button id="eaBtnEditarAgend" onclick="eaIrPaso(1)"
+                        style="display:none;margin-top:8px;background:rgba(255,255,255,.15);
+                               border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;
+                               padding:4px 12px;font-size:.72rem;font-weight:600;cursor:pointer;
+                               letter-spacing:.3px;">
+                    &#9998; Editar agendamiento
+                </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span id="fbEACounterPill" style="display:inline-flex;align-items:center;gap:5px;
+                    padding:3px 12px;border-radius:20px;font-size:.72rem;font-weight:700;
+                    background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);">
+                    0 / <?= $maxObjetivos ?> obj.
+                </span>
+                <button onclick="cerrarModalEA()" style="background:rgba(255,255,255,.15);border:none;
+                        color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;
+                        cursor:pointer;line-height:1;">&#215;</button>
+            </div>
+        </div>
+
+        <!-- Stepper 4 pasos -->
+        <div class="fb-stepper" style="margin-top:18px;margin-bottom:0;">
+            <div class="fb-step-wrap">
+                <div class="fb-step-circle active" id="eaStepCircle1" style="background:rgba(255,255,255,.25);">1</div>
+                <div class="fb-step-label active" id="eaStepLabel1" style="color:#fff;">Feedback</div>
+            </div>
+            <div class="fb-step-connector" id="eaStepConn1" style="background:rgba(255,255,255,.2);"></div>
+            <div class="fb-step-wrap">
+                <div class="fb-step-circle pending" id="eaStepCircle2">2</div>
+                <div class="fb-step-label pending" id="eaStepLabel2" style="color:rgba(255,255,255,.45);">Competencias EA</div>
+            </div>
+            <div class="fb-step-connector" id="eaStepConn2" style="background:rgba(255,255,255,.2);"></div>
+            <div class="fb-step-wrap">
+                <div class="fb-step-circle pending" id="eaStepCircle3">3</div>
+                <div class="fb-step-label pending" id="eaStepLabel3" style="color:rgba(255,255,255,.45);">Objetivos SMART</div>
+            </div>
+            <div class="fb-step-connector" id="eaStepConn3" style="background:rgba(255,255,255,.2);"></div>
+            <div class="fb-step-wrap">
+                <div class="fb-step-circle pending" id="eaStepCircle4">4</div>
+                <div class="fb-step-label pending" id="eaStepLabel4" style="color:rgba(255,255,255,.45);">Firma</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Body -->
+    <div style="overflow-y:auto;flex:1;padding:22px 28px;">
+
+        <!-- PASO 1: Registro de feedback -->
+        <div id="eaPasoFeedback">
+            <div style="font-size:.82rem;color:var(--fb-muted);margin:0 0 16px;line-height:1.6;">
+                Registra la reuni&oacute;n de feedback con el colaborador para la Experiencia Azul.
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                <div>
+                    <label class="fl2-field-label">Fecha de la reuni&oacute;n</label>
+                    <input class="fl2-input" type="date" id="eaFbFecha">
+                </div>
+                <div>
+                    <label class="fl2-field-label">Hora</label>
+                    <input class="fl2-input" type="time" id="eaFbHora">
+                </div>
+            </div>
+            <div style="margin-bottom:16px;">
+                <label class="fl2-field-label">Observaciones de la reuni&oacute;n</label>
+                <textarea class="fl2-input" id="eaFbObs" rows="3" style="resize:vertical;"
+                    placeholder="Temas tratados, compromisos, contexto..."></textarea>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button onclick="cerrarModalEA()" style="padding:10px 18px;border:1.5px solid #e2e8f0;
+                        border-radius:10px;background:#fff;color:#64748b;font-size:.85rem;
+                        font-weight:600;cursor:pointer;">Cancelar</button>
+                <button id="eaBtnGuardarFb" onclick="eaGuardarFeedback()"
+                        style="background:linear-gradient(135deg,#0058af,#0074e0);color:#fff;border:none;
+                               border-radius:10px;padding:10px 24px;font-weight:700;font-size:.88rem;
+                               cursor:pointer;box-shadow:0 4px 12px rgba(0,88,175,.3);">
+                    Guardar y continuar &rarr;
+                </button>
+            </div>
+        </div>
+
+        <!-- PASO 2: Competencias EA -->
+        <div id="eaPasoComps" style="display:none;">
+            <p style="font-size:.82rem;color:var(--fb-muted);margin:0 0 16px;line-height:1.6;">
+                Selecciona la competencia de Experiencia Azul a trabajar.
+                Las calificaciones corresponden a tu evaluaci&oacute;n como l&iacute;der al colaborador en las competencias EA.
+            </p>
+            <div id="eaGridComps">
+                <div style="padding:32px;text-align:center;color:var(--fb-muted);">
+                    <div style="width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#0058af;
+                                border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px;"></div>
+                    Cargando calificaciones EA...
+                </div>
+            </div>
+        </div>
+
+        <!-- PASO 3: Objetivos expandibles -->
+        <div id="eaPasoObjs" style="display:none;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+                <button onclick="eaIrPaso(2)" style="display:flex;align-items:center;gap:5px;
+                        background:#f1f5f9;border:none;border-radius:8px;padding:7px 14px;
+                        font-size:.8rem;cursor:pointer;color:#475569;font-weight:600;">
+                    &larr; Volver
+                </button>
+                <div>
+                    <div id="eaCompLabel" style="font-size:.95rem;font-weight:800;color:#0058af;"></div>
+                    <div style="font-size:.72rem;color:var(--fb-muted);">
+                        Selecciona un objetivo y completa los detalles
+                    </div>
+                </div>
+            </div>
+            <div id="eaGridObjs">
+                <div style="padding:24px;text-align:center;color:var(--fb-muted);">Cargando objetivos...</div>
+            </div>
+            <div style="margin-top:18px;display:flex;justify-content:flex-end;gap:10px;">
+                <button onclick="cerrarModalEA(true)" style="padding:10px 20px;border:1.5px solid #e2e8f0;
+                        border-radius:10px;background:#fff;color:#64748b;font-size:.85rem;
+                        font-weight:600;cursor:pointer;">Cerrar</button>
+                <button id="eaBtnAsignar" onclick="eaAsignarObjetivo()"
+                        style="background:linear-gradient(135deg,#0058af,#0074e0);color:#fff;border:none;
+                               border-radius:10px;padding:10px 28px;font-weight:700;font-size:.88rem;
+                               cursor:pointer;box-shadow:0 4px 14px rgba(0,88,175,.35);
+                               display:flex;align-items:center;gap:6px;">
+                    &#10003; Asignar Objetivo
+                </button>
+            </div>
+        </div>
+
+        <!-- PASO 4: Firma del colaborador -->
+        <div id="eaPasoFirma" style="display:none;">
+            <!-- Banner éxito objetivos -->
+            <div style="background:#ecfdf5;border:1.5px solid #6ee7b7;border-radius:12px;
+                        padding:14px 18px;margin-bottom:16px;">
+                <div style="font-size:.8rem;font-weight:700;color:#065f46;margin-bottom:3px;">
+                    &#10003; Objetivos EA asignados correctamente
+                </div>
+                <div style="font-size:.78rem;color:#047857;">
+                    Para completar el proceso, el colaborador debe firmar
+                    el recibido de los objetivos de Experiencia Azul.
+                </div>
+            </div>
+
+            <!-- Panel dual: Líder EA / Colaborador -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                <!-- Líder EA (ya registrado) -->
+                <div style="background:#f0f9ff;border:1.5px solid #bae6fd;
+                            border-radius:10px;padding:14px;text-align:center;">
+                    <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;
+                                text-transform:uppercase;color:#0369a1;margin-bottom:8px;">
+                        L&iacute;der EA
+                    </div>
+                    <div style="font-size:1.4rem;margin-bottom:4px;color:#0891b2;">&#9998;</div>
+                    <div id="eaNombreLiderFirma" style="font-size:.82rem;font-weight:600;color:#0c4a6e;">
+                        <?= htmlspecialchars(($_SESSION['nombres'] ?? '') . ' ' . ($_SESSION['apellidos'] ?? '')) ?>
+                    </div>
+                    <div style="font-size:.7rem;color:#0891b2;margin-top:4px;">
+                        &#10003; Feedback EA registrado
+                    </div>
+                </div>
+                <!-- Colaborador (firma pendiente) -->
+                <div style="background:#f8fafc;border:1.5px solid #e2e8f0;
+                            border-radius:10px;padding:14px;text-align:center;">
+                    <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;
+                                text-transform:uppercase;color:#64748b;margin-bottom:8px;">
+                        Colaborador
+                    </div>
+                    <div style="font-size:1.4rem;margin-bottom:4px;">·</div>
+                    <div id="eaFirmaNombre" style="font-size:.82rem;font-weight:600;color:#1e293b;"></div>
+                    <div id="eaEstadoFirma" style="font-size:.7rem;color:#d97706;margin-top:4px;">
+                        · Pendiente de firma
+                    </div>
+                </div>
+            </div>
+
+            <!-- Formulario de credenciales -->
+            <div id="eaFormFirma">
+                <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;
+                            letter-spacing:.05em;color:#64748b;margin-bottom:8px;">
+                    El colaborador ingresa sus credenciales
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+                    <div>
+                        <label class="fl2-field-label">&#128196; Identificaci&oacute;n</label>
+                        <input class="fl2-input" type="text" id="eaFirmaCedula"
+                               placeholder="N&uacute;mero de c&eacute;dula..." autocomplete="off">
+                    </div>
+                    <div>
+                        <label class="fl2-field-label">· Contrase&ntilde;a</label>
+                        <input class="fl2-input" type="password" id="eaFirmaPassword"
+                               placeholder="Contrase&ntilde;a del sistema..." autocomplete="new-password">
+                    </div>
+                </div>
+                <div style="font-size:.73rem;color:#64748b;margin-bottom:14px;">
+                    · El colaborador debe ingresar sus propias credenciales para confirmar el recibido.
+                </div>
+            </div>
+
+            <!-- Confirmación firma exitosa -->
+            <div id="eaFirmaOk" style="display:none;text-align:center;padding:12px;">
+                <div style="font-size:1.6rem;margin-bottom:6px;color:#0891b2;">&#10003;</div>
+                <div style="font-size:.95rem;font-weight:700;color:#065f46;">Proceso completado</div>
+                <div style="font-size:.82rem;color:#64748b;margin-top:4px;">
+                    El colaborador firm&oacute; el recibido de Experiencia Azul exitosamente.
+                </div>
+            </div>
+
+            <!-- Panel seguimiento EA (visible cuando ya firmado) -->
+            <div id="eaPanelSeguimiento" style="display:none;margin-top:16px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <div style="width:4px;height:18px;background:#0891b2;border-radius:2px;"></div>
+                    <div style="font-weight:700;font-size:.85rem;color:#0c4a6e;">
+                        Seguimiento de objetivos Experiencia Azul
+                    </div>
+                </div>
+                <div id="eaListaSeguimiento">
+                    <div style="text-align:center;padding:20px;color:var(--fb-muted);font-size:.82rem;">
+                        Cargando objetivos...
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
+                <button onclick="cerrarModalEA(true)"
+                        style="padding:10px 20px;border:1.5px solid #e2e8f0;
+                               border-radius:10px;background:#fff;color:#64748b;font-size:.85rem;
+                               font-weight:600;cursor:pointer;font-family:inherit;">Cerrar</button>
+                <button id="eaBtnFirmar" onclick="eaFirmar()"
+                        style="background:linear-gradient(135deg,#0891b2,#06b6d4);color:#fff;border:none;
+                               border-radius:10px;padding:10px 28px;font-weight:700;font-size:.88rem;
+                               cursor:pointer;box-shadow:0 4px 14px rgba(8,145,178,.3);
+                               display:flex;align-items:center;gap:6px;font-family:inherit;">
+                    <?= icon('pencil', 16) ?> Firmar conformidad EA
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+</div>
+
+
 <script>
-const FB_APP_URL    = '<?= APP_URL ?>';
-const FB_PERIODO    = <?= $periodoActivo ? json_encode(['IDPERIODO' => (int)$periodoActivo['IDPERIODO']]) : 'null' ?>;
-const FB_MAX_OBJ    = <?= $maxObjetivos ?>;
+// ── Accordion flujos ─────────────────────────────────────────────────────────
+function fbToggleAcc(bodyId, chevId) {
+    document.getElementById(bodyId).classList.toggle('fb-collapsed');
+    document.getElementById(chevId).classList.toggle('fb-collapsed');
+}
+
+const FB_APP_URL        = '<?= APP_URL ?>';
+const FB_PERIODO        = <?= $periodoActivo ? json_encode(['IDPERIODO' => (int)$periodoActivo['IDPERIODO']]) : 'null' ?>;
+const FB_MAX_OBJ        = <?= $maxObjetivos ?>;
+const FB_PERIODO_VENCIDO = <?= $periodoVencido ? 'true' : 'false' ?>;
 const FB_COMP_NAMES = <?= json_encode($nombresComp, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 const FB_CAL_LABELS = <?= json_encode($calLabels) ?>;
 const FB_CAL_COLORS = <?= json_encode($calColors) ?>;
@@ -1234,7 +1979,18 @@ let fbState = {
     firmado:        0,
 };
 
+function _periodoVencidoSwal() {
+    Swal.fire({
+        icon: 'warning', title: 'Período cerrado',
+        html: 'El período de evaluación ha cerrado.<br>' +
+              '<span style="font-size:.85rem;color:#64748b;">No se pueden registrar nuevas acciones de feedback.</span>',
+        confirmButtonColor: '#dc2626', confirmButtonText: 'Entendido',
+        didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; }
+    });
+}
+
 function abrirModalFeedback(idEmp, nombre, cargo, tieneFeedback, idFeedback, fecha, obs, totalAcuerdos, firmado) {
+    if (FB_PERIODO_VENCIDO && !tieneFeedback) { _periodoVencidoSwal(); return; }
     fbState.idEmpleado    = idEmp;
     fbState.nombreColab   = nombre;
     fbState.cargoColab    = cargo;
@@ -1366,6 +2122,10 @@ function irPaso(paso) {
         btn.style.display = '';
     }
 
+    // Botón cancelar: cambia texto en el paso de firma
+    const btnCanc = document.getElementById('fbBtnCancelar');
+    if (btnCanc) btnCanc.textContent = paso === 4 ? 'Firmar después' : 'Cancelar';
+
     // Cargar competencias en paso 2
     if (paso === 2 && Object.keys(fbState.calificaciones).length === 0) {
         cargarCalificaciones();
@@ -1460,6 +2220,7 @@ function firmarColaborador() {
 }
 
 function guardarFeedback() {
+    if (FB_PERIODO_VENCIDO) { _periodoVencidoSwal(); return; }
     const fecha = document.getElementById('fbFecha').value;
     const hora  = document.getElementById('fbHora').value || '00:00';
     const obs   = document.getElementById('fbObservacion').value.trim();
@@ -1540,62 +2301,78 @@ function cargarCalificaciones() {
 }
 
 function renderCompetencias(cals) {
-    const grid = document.getElementById('fbCompGrid');
-    const auto  = cals.auto  || {};
-    const lider = cals.lider || {};
+    const grid  = document.getElementById('fbCompGrid');
+    const lider = (cals.lider || {});
 
-    // Mapa de texto a número
     const calTextToNum = {
         'Insuficiente': 1, 'Necesita Mejorar': 2, 'Requiere mejora': 2,
         'Aceptable': 3, 'Acorde': 4, 'Sobresaliente': 5
     };
-
     function getCalNum(val) {
         if (!val) return 0;
         if (!isNaN(parseInt(val))) return parseInt(val);
         return calTextToNum[val] || 0;
     }
 
-    // Usar calificaciones del lider al colaborador (HUMEVALUACIONCOLABO)
-    let html = '';
-    // Competencias ya asignadas
     const yaAsignadas = new Set((fbState.acuerdos || []).map(a => parseInt(a.NUM_COMPETENCIA)));
+    const maximo = yaAsignadas.size >= FB_MAX_OBJ;
+    let html = '';
 
     for (let i = 1; i <= 11; i++) {
         const calNum   = getCalNum(lider['PREGUNTA' + i]);
         if (!calNum) continue;
-        const calLabel  = FB_CAL_LABELS[calNum] || String(lider['PREGUNTA' + i]);
-        const colors    = FB_CAL_COLORS[calNum] || {bg:'#f1f5f9',color:'#64748b'};
-        const nombre    = FB_COMP_NAMES[i] || 'Competencia ' + i;
-        const asignada  = yaAsignadas.has(i);
-        const badgeHTML = asignada
-            ? '<span style="margin-left:auto;font-size:.7rem;padding:2px 8px;border-radius:20px;background:#dcfce7;color:#166534;font-weight:700;flex-shrink:0;">✓ Asignado</span>'
-            : '';
-        html += '<div class="fb-comp-item' + (asignada ? ' fb-comp-asignada' : '') + '" onclick="selCompetencia(' + i + ', \'' + calLabel + '\')" data-comp="' + i + '">' +
-            '<div style="display:flex;align-items:center;gap:8px;width:100%;">' +
-            '<div class="fb-comp-name">' + nombre + '</div>' +
-            badgeHTML +
-            '</div>' +
-            '<span class="fb-comp-cal" style="background:' + colors.bg + ';color:' + colors.color + ';">' + calLabel + '</span>' +
-            '</div>';
-    }
+        const calLabel = FB_CAL_LABELS[calNum] || String(lider['PREGUNTA' + i]);
+        const colors   = FB_CAL_COLORS[calNum] || {bg:'#f1f5f9', color:'#64748b'};
+        const nombre   = FB_COMP_NAMES[i] || 'Competencia ' + i;
+        const asignada = yaAsignadas.has(i);
+        const bloqueada = maximo && !asignada;
 
-    // P12-P16 van en pestaña separada "Feedback a Líderes" — pendiente Flujo 2
+        html += `<div class="fl2-comp-row${asignada ? ' asignada' : ''}"
+            ${!asignada && !bloqueada ? `data-comp="${i}" data-cal="${fbEscapeJs(calLabel)}"` : ''}
+            style="${bloqueada ? 'opacity:.45;cursor:not-allowed;' : ''}">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <div style="width:36px;height:36px;border-radius:10px;
+                            background:${asignada ? '#dcfce7' : 'linear-gradient(135deg,#dbeafe,#bfdbfe)'};
+                            display:flex;align-items:center;justify-content:center;font-size:.72rem;
+                            font-weight:800;color:${asignada ? '#15803d' : '#1e40af'};flex-shrink:0;">
+                    P${i}
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:.88rem;color:#1e293b;">${nombre}</div>
+                    <div style="font-size:.72rem;color:var(--fb-muted);">Calificación del líder</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span style="background:${colors.bg};color:${colors.color};padding:3px 12px;
+                             border-radius:20px;font-size:.72rem;font-weight:700;">${calLabel}</span>
+                ${asignada
+                    ? '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;">✓ Asignado</span>'
+                    : bloqueada
+                        ? '<span style="font-size:.72rem;color:#94a3b8;">Máx. alcanzado</span>'
+                        : '<span style="color:#0058af;font-size:.78rem;font-weight:600;">Ver objetivos →</span>'
+                }
+            </div>
+        </div>`;
+    }
 
     if (!html) {
-        html = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:var(--fb-muted);font-size:13px;">No hay calificaciones disponibles para este colaborador en el período actual.</div>';
+        html = '<div style="text-align:center;padding:24px;color:var(--fb-muted);font-size:13px;">No hay calificaciones disponibles para este colaborador en el período actual.</div>';
     }
     grid.innerHTML = html;
+
+    grid.querySelectorAll('.fl2-comp-row[data-comp]').forEach(row => {
+        row.addEventListener('click', () => {
+            selCompetencia(parseInt(row.dataset.comp), row.dataset.cal);
+        });
+    });
 }
 
 function selCompetencia(numComp, calLabel) {
     fbState.compSeleccionada = parseInt(numComp);
     fbState.calSeleccionada  = calLabel;
-    document.querySelectorAll('.fb-comp-item').forEach(el => el.classList.remove('selected'));
-    document.querySelector('[data-comp="' + numComp + '"]')?.classList.add('selected');
-    // Actualizar botón para indicar selección
-    const btn = document.getElementById('fbBtnAccion');
-    btn.textContent = 'Ver objetivos de ' + (FB_COMP_NAMES[numComp] || 'competencia') + ' →';
+    fbState.objSeleccionado  = null;
+    cargarObjetivos(numComp, calLabel);
+    irPaso(3);
 }
 
 function cargarObjetivos(numComp, calLabel) {
@@ -1647,6 +2424,7 @@ function selObjetivo(idObj, el, indicador, meta, plazo, evidencia, seguimiento) 
 }
 
 function asignarObjetivo() {
+    if (FB_PERIODO_VENCIDO) { _periodoVencidoSwal(); return; }
     if (!fbState.objSeleccionado) {
         Swal.fire({ icon:'warning', title:'Selecciona un objetivo SMART', showConfirmButton:false, timer:1800 });
         return;
@@ -1866,9 +2644,11 @@ function cerrarSegModal() {
 }
 
 function guardarSeguimiento() {
-    const esFlujo2  = document.getElementById('fbSeguimientoModal').dataset.flujo === '2';
+    const flujo     = document.getElementById('fbSeguimientoModal').dataset.flujo;
+    const esFlujo2  = flujo === '2';
+    const esFlujo3  = flujo === '3';
     // Leer idAcuerdo de la variable correcta según el flujo activo
-    const idAcuerdo = esFlujo2 ? fl2SegState.idAcuerdo : fbSegState.idAcuerdo;
+    const idAcuerdo = esFlujo2 ? fl2SegState.idAcuerdo : (esFlujo3 ? eaSegState.idAcuerdo : fbSegState.idAcuerdo);
     if (!idAcuerdo) return;
     const btn = event.target;
     btn.disabled = true;
@@ -1891,9 +2671,11 @@ function guardarSeguimiento() {
         if (res.ok) {
             cerrarSegModal();
             if (esFlujo2) {
-                fl2CargarSeguimiento(); // Recarga panel Flujo 2 (director → líder)
+                fl2CargarSeguimiento();
+            } else if (esFlujo3) {
+                eaCargarSeguimiento();
             } else {
-                cargarPanelSeguimiento(fbState.idEmpleado); // Recarga panel Proceso 1
+                cargarPanelSeguimiento(fbState.idEmpleado);
             }
             Swal.fire({ icon:'success', title:'Seguimiento guardado', showConfirmButton:false, timer:1600 });
         } else {
@@ -1906,11 +2688,7 @@ function guardarSeguimiento() {
 // ══════════════════════════════════════════════════════
 // FLUJO 2 — Feedback director a líderes (P12-P16)
 // ══════════════════════════════════════════════════════
-const FL2_COMP_NAMES = {
-    12: 'Propósito', 13: 'Colaboración', 14: 'Consistencia',
-    15: 'Adaptabilidad', 16: 'Amor'
-};
-const FL2_MAX_OBJ = 3;
+const FL2_MAX_OBJ = FB_MAX_OBJ;
 
 let fl2State = {
     idLider: null, nombre: '', cargo: '', idFeedback: 0,
@@ -1920,14 +2698,17 @@ let fl2State = {
 };
 
 // ── Abrir modal ──────────────────────────────────────────────────────────
-function abrirFeedbackLider(idLider, nombre, cargo, idFeedback, irAFirma) {
+function abrirFeedbackLider(idLider, nombre, cargo, idFeedback, irAFirma, fecha, obs, firmado) {
+    if (FB_PERIODO_VENCIDO && !idFeedback) { _periodoVencidoSwal(); return; }
     idFeedback = idFeedback || 0;
     fl2State = { idLider, nombre, cargo, idFeedback,
+                 fecha: fecha || '', obs: obs || '',
                  cals: {}, compSel: null, calSel: '',
                  objSel: null, acuerdosCount: 0, acuerdosComp: new Set(),
                  tieneFeedback: idFeedback > 0 };
     document.getElementById('fl2NombreLider').textContent = nombre;
     document.getElementById('fl2CargoLider').textContent  = cargo;
+    document.getElementById('fl2BtnEditarAgend').style.display = (idFeedback > 0 && !firmado) ? '' : 'none';
     document.getElementById('fl2ModalOverlay').style.display = 'flex';
     fl2ActualizarContador(0);
 
@@ -2086,16 +2867,123 @@ function fl2AbrirSegModal(idAcuerdo, comp, obj, estado, comentario) {
     document.getElementById('fbSeguimientoModal').style.display = 'flex';
 }
 
+// ── FLUJO 3 EA — Seguimiento ─────────────────────────────────────────────
+let eaSegState = { idAcuerdo: null };
+
+function eaAbrirSegModal(idAcuerdo, comp, obj, estado, comentario) {
+    eaSegState.idAcuerdo = idAcuerdo;
+    document.getElementById('fbSegCompNombre').textContent = comp;
+    document.getElementById('fbSegObjTexto').textContent   = obj;
+    const sel = document.getElementById('fbSegEstado');
+    sel.value = (estado === 'RESPONDIDO' || estado === 'APROBADO') ? estado : 'RESPONDIDO';
+    document.getElementById('fbSegComentario').value = comentario || '';
+    document.getElementById('fbSeguimientoModal').dataset.flujo = '3';
+    document.getElementById('fbSeguimientoModal').style.display = 'flex';
+}
+
+function eaCargarSeguimiento() {
+    const panel = document.getElementById('eaPanelSeguimiento');
+    const lista  = document.getElementById('eaListaSeguimiento');
+    if (!panel || !lista) return;
+    panel.style.display = '';
+    lista.innerHTML = '<div style="padding:16px;text-align:center;color:var(--fb-muted);font-size:.82rem;">Cargando...</div>';
+    fetch(FB_APP_URL + 'feedback/?action=getAcuerdos&idEmpleado=' + eaState.idEmpleado + '&flujo=3', {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(acuerdos => {
+        if (!acuerdos.length) {
+            lista.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:.8rem;padding:12px;">Sin objetivos EA asignados.</div>';
+            return;
+        }
+        const EC = {
+            'PENDIENTE_FIRMA': {bg:'#f1f5f9',color:'#64748b',label:'Por firmar'},
+            'PENDIENTE':  {bg:'#fef3c7',color:'#92400e',label:'Pendiente'},
+            'RESPONDIDO': {bg:'#dbeafe',color:'#1e40af',label:'Respondido'},
+            'APROBADO':   {bg:'#dcfce7',color:'#15803d',label:'Aprobado'},
+        };
+        let html = '';
+        acuerdos.forEach(a => {
+            const comp  = FB_COMP_NAMES[parseInt(a.NUM_COMPETENCIA)] || 'P' + a.NUM_COMPETENCIA;
+            const ec    = EC[a.ESTADO] || EC['PENDIENTE'];
+            const obj   = a.OBJETIVO            || '';
+            const plan  = a.PLAN_ACCION         || '';
+            const com   = a.COMENTARIO_LIDER    || '';
+            const ind   = a.INDICADOR           || '';
+            const meta  = a.META                || '';
+            const plaz  = a.PLAZO               || '';
+            const evid  = a.EVIDENCIA           || '';
+            const apoy  = a.APOYO_LIDER         || '';
+            const compE = comp.replace(/'/g, "\\'");
+            const objE  = obj.substring(0, 50).replace(/'/g, "\\'");
+            const comE  = com.replace(/'/g, "\\'");
+            let accionHtml = '';
+            if (a.ESTADO === 'RESPONDIDO') {
+                accionHtml = `<button onclick="eaAbrirSegModal(${a.IDACUERDO},'${compE}','${objE}','${a.ESTADO}','${comE}')"
+                    style="padding:5px 12px;border:1.5px solid #0891b2;border-radius:6px;background:#fff;
+                           color:#0891b2;font-size:.72rem;font-weight:600;cursor:pointer;margin-top:6px;">
+                    ✓ Aprobar / Comentar
+                </button>`;
+            } else if (a.ESTADO === 'APROBADO') {
+                accionHtml = '<span style="color:#15803d;font-size:.72rem;font-weight:600;">✓ Aprobado</span>';
+            } else {
+                accionHtml = '<span style="color:#94a3b8;font-size:.72rem;">Esperando respuesta del colaborador</span>';
+            }
+            html += `<div style="border:1.5px solid #bae6fd;border-radius:10px;padding:12px 14px;
+                                 margin-bottom:10px;background:#f0f9ff;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:700;font-size:.78rem;color:#0891b2;">${comp}</div>
+                        <div style="font-size:.78rem;color:#475569;margin-top:2px;">${obj}</div>
+                    </div>
+                    <span style="background:${ec.bg};color:${ec.color};padding:3px 10px;
+                                 border-radius:20px;font-weight:600;font-size:.72rem;">${ec.label}</span>
+                </div>
+                ${(ind||meta||plaz||evid||apoy) ? `<div style="background:#fff;border:1px solid #bae6fd;border-radius:7px;
+                    padding:7px 12px;margin-top:8px;font-size:.77rem;color:#0369a1;line-height:1.6;">
+                    ${ind  ? '<strong>Indicador:</strong> '       + ind  + '<br>' : ''}
+                    ${meta ? '<strong>Meta:</strong> '            + meta + '<br>' : ''}
+                    ${plaz ? '<strong>Plazo:</strong> '           + plaz + '<br>' : ''}
+                    ${evid ? '<strong>Evidencia:</strong> '       + evid + '<br>' : ''}
+                    ${apoy ? '<strong>Apoyo líder:</strong> ' + apoy          : ''}
+                </div>` : ''}
+                ${plan ? `<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:7px;
+                    padding:8px 12px;margin-top:8px;font-size:.78rem;color:#166534;">
+                    <strong>Respuesta del colaborador:</strong><br>${plan}
+                </div>` : ''}
+                ${com ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;
+                    padding:7px 12px;margin-top:6px;font-size:.75rem;color:#1e40af;">
+                    💬 <strong>Tu comentario:</strong> ${com}
+                </div>` : ''}
+                <div style="margin-top:6px;">${accionHtml}</div>
+            </div>`;
+        });
+        lista.innerHTML = html;
+    });
+}
+
 function fl2IrPasoFeedback() {
-    fl2IrPaso('feedback'); // muestra fl2PasoFeedback, oculta el resto, actualiza stepper
-    // Limpiar campos
-    const hoy = new Date();
-    document.getElementById('fl2FbFecha').value = hoy.toISOString().split('T')[0];
-    document.getElementById('fl2FbHora').value  = hoy.toTimeString().slice(0,5);
-    document.getElementById('fl2FbObs').value   = '';
+    fl2IrPaso('feedback');
+    if (fl2State.tieneFeedback && fl2State.fecha) {
+        // Pre-rellenar con datos existentes (formato DD/MM/YYYY HH:MM)
+        const [fechaPart, horaPart] = fl2State.fecha.split(' ');
+        const parts = fechaPart ? fechaPart.split('/') : [];
+        if (parts.length === 3)
+            document.getElementById('fl2FbFecha').value = parts[2] + '-' + parts[1] + '-' + parts[0];
+        if (horaPart)
+            document.getElementById('fl2FbHora').value = horaPart;
+        document.getElementById('fl2FbObs').value = fl2State.obs || '';
+    } else {
+        // Nuevo feedback — pre-poblar fecha y hora actuales
+        const hoy = new Date();
+        document.getElementById('fl2FbFecha').value = hoy.toISOString().split('T')[0];
+        document.getElementById('fl2FbHora').value  = hoy.toTimeString().slice(0, 5);
+        document.getElementById('fl2FbObs').value   = '';
+    }
 }
 
 function fl2GuardarFeedback() {
+    if (FB_PERIODO_VENCIDO) { _periodoVencidoSwal(); return; }
     const fecha   = document.getElementById('fl2FbFecha').value;
     const hora    = document.getElementById('fl2FbHora').value || '00:00';
     if (!fecha) {
@@ -2309,7 +3197,7 @@ function fl2RenderCompetencias() {
         const val      = cals[p].VALOR;
         const calLabel = CAL_LABELS[val] || 'Valor ' + val;
         const colors   = CAL_COLORS[val] || {bg:'#f1f5f9',color:'#64748b'};
-        const nombre   = FL2_COMP_NAMES[p] || 'P' + p;
+        const nombre   = FB_COMP_NAMES[p] || 'P' + p;
         const asignada = fl2State.acuerdosComp.has(p);
         const bloqueada = maximo && !asignada;
 
@@ -2355,7 +3243,7 @@ function fl2SelCompetencia(numComp, calLabel) {
     fl2State.objSel  = null;
     fl2State.objData = null;
     document.getElementById('fl2CompLabel').textContent =
-        (FL2_COMP_NAMES[numComp] || 'P' + numComp) + ' · ' + calLabel;
+        (FB_COMP_NAMES[numComp] || 'P' + numComp) + ' · ' + calLabel;
     fl2IrPaso(2);
     const grid = document.getElementById('fl2GridObjs');
     grid.innerHTML = '<div style="padding:24px;text-align:center;color:var(--fb-muted);">Cargando objetivos...</div>';
@@ -2391,31 +3279,41 @@ function fl2SelCompetencia(numComp, calLabel) {
                         <div>
                             <label class="fl2-field-label">Indicador</label>
                             <input class="fl2-input" id="fl2Ind_${obj.IDOBJETIVO}" type="text"
-                                   value="${fbEscapeJs(obj.INDICADOR||'')}" placeholder="¿Cómo se medirá el avance?">
+                                   value="${fbEscapeJs(obj.INDICADOR||'')}" placeholder="¿Cómo se medirá el avance?"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
                         </div>
                         <div>
                             <label class="fl2-field-label">Meta</label>
                             <input class="fl2-input" id="fl2Met_${obj.IDOBJETIVO}" type="text"
-                                   value="${fbEscapeJs(obj.META||'')}" placeholder="Resultado esperado">
+                                   value="${fbEscapeJs(obj.META||'')}" placeholder="Resultado esperado"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
                         </div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
                         <div>
                             <label class="fl2-field-label">Plazo</label>
                             <input class="fl2-input" id="fl2Plz_${obj.IDOBJETIVO}" type="text"
-                                   value="${fbEscapeJs(obj.PLAZO||'')}" placeholder="Ej: 12 meses">
+                                   value="${fbEscapeJs(obj.PLAZO||'')}" placeholder="Ej: 12 meses"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
                         </div>
                         <div>
                             <label class="fl2-field-label">Evidencia</label>
                             <input class="fl2-input" id="fl2Evi_${obj.IDOBJETIVO}" type="text"
-                                   value="${fbEscapeJs(obj.EVIDENCIA||'')}" placeholder="¿Cómo se demostrará?">
+                                   value="${fbEscapeJs(obj.EVIDENCIA||'')}" placeholder="¿Cómo se demostrará?"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
                         </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label class="fl2-field-label">Seguimiento sugerido</label>
+                        <input class="fl2-input" id="fl2Seg_${obj.IDOBJETIVO}" type="text"
+                               value="${fbEscapeJs(obj.SEGUIMIENTO||'')}" placeholder="Ej: Mensual, Trimestral..."
+                               readonly style="background:#f8fafc;cursor:default;color:#475569;">
                     </div>
                     <div style="margin-bottom:12px;">
                         <label class="fl2-field-label">Apoyo del director</label>
                         <textarea class="fl2-input" id="fl2Apo_${obj.IDOBJETIVO}" rows="2"
                                   style="resize:vertical;"
-                                  placeholder="¿Qué recursos o apoyo brindarás al líder?"></textarea>
+                                  placeholder="Define el acompañamiento, formación, recursos, autoridad o espacio de seguimiento que debes aportar para viabilizar este compromiso."></textarea>
                     </div>
                     <div style="margin-bottom:4px;">
                         <label class="fl2-field-label">Compromiso ajustado</label>
@@ -2468,21 +3366,30 @@ function fl2Asignar() {
             confirmButtonColor:'#0058af' });
         return;
     }
+    const id = fl2State.objSel;
+    const apoyo = document.getElementById('fl2Apo_' + id)?.value.trim() || '';
+    if (!apoyo) {
+        Swal.fire({ icon:'warning', title:'Campo requerido',
+            text: 'El apoyo del director es obligatorio.',
+            confirmButtonColor:'#0058af',
+            didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        return;
+    }
     const btn = document.getElementById('fl2BtnAsignar');
     btn.disabled = true; btn.textContent = 'Guardando...';
 
-    const id = fl2State.objSel;
     const body = new URLSearchParams({
         action:       'asignarObjetivo',
         idEmpleado:   fl2State.idLider,
         idObjetivo:   id,
         numComp:      fl2State.compSel,
         calificacion: fl2State.calSel,
-        apoyo:        document.getElementById('fl2Apo_' + id)?.value || '',
+        apoyo,
         indicador:    document.getElementById('fl2Ind_' + id)?.value || '',
         meta:         document.getElementById('fl2Met_' + id)?.value || '',
         plazo:        document.getElementById('fl2Plz_' + id)?.value || '',
         evidencia:    document.getElementById('fl2Evi_' + id)?.value || '',
+        seguimiento:  document.getElementById('fl2Seg_' + id)?.value || '',
         compromiso:   document.getElementById('fl2Com_' + id)?.value || '',
         idFeedback:   fl2State.idFeedback || 0,
     });
@@ -2666,6 +3573,7 @@ function iniciarTourFeedback() {
         var tienePeriodo = <?= $periodoActivo    ? 'true' : 'false' ?>;
         var tieneEquipo  = <?= !empty($equipo)        ? 'true' : 'false' ?>;
         var tieneDir     = <?= !empty($lideresACargo) ? 'true' : 'false' ?>;
+        var tieneEA      = <?= !empty($equipoEA)      ? 'true' : 'false' ?>;
 
         // Helper — icon HTML (Tabler)
         function ic(name, color) {
@@ -2703,16 +3611,17 @@ function iniciarTourFeedback() {
         if (tienePeriodo) {
 
             // ── 2. Stats ────────────────────────────────────────────────────
-            if (document.querySelector('.fb-stats')) {
+            if (document.querySelector('.fb-flow-stats')) {
                 pasos.push({
-                    element: '.fb-stats',
+                    element: '.fb-flow-stats',
                     popover: {
-                        title:       ic('chart-bar') + ' Resumen del equipo',
-                        description: 'Indicadores de avance del período:<br><br>' +
-                                     '<strong>Colaboradores</strong> — total a tu cargo<br>' +
-                                     '<strong>Con feedback</strong> — reunión ya registrada<br>' +
-                                     '<strong>Con objetivos SMART</strong> — compromisos asignados<br>' +
-                                     '<strong>Proceso completo</strong> — feedback + objetivos + firma',
+                        title:       ic('chart-bar') + ' Panel de avance por flujo',
+                        description: 'Cada tarjeta resume el estado de un flujo en el período actual:<br><br>' +
+                                     ic('users','#0058af') + ' <strong>Flujo 1 · Desempeño</strong> — tu equipo directo<br>' +
+                                     ic('shield','#7c3aed') + ' <strong>Flujo 2 · Liderazgo</strong> — líderes a tu cargo (solo directores)<br>' +
+                                     ic('star','#0891b2') + ' <strong>Flujo 3 · Exp. Azul</strong> — personal asistencial<br><br>' +
+                                     'La barra de progreso indica el % que ya <strong>firmó el recibido</strong>. ' +
+                                     'Solo aparecen los flujos que aplican a tu rol.',
                         side: 'bottom', align: 'start'
                     }
                 });
@@ -2752,26 +3661,78 @@ function iniciarTourFeedback() {
                 pasos.push({
                     element: '.fb-table tbody tr:first-child td:last-child',
                     popover: {
-                        title:       ic('player-play') + ' Iniciar el proceso',
-                        description: 'Haz clic en <strong>Registrar</strong> para abrir el asistente de 4 pasos:<br><br>' +
+                        title:       ic('player-play') + ' Flujo 1 · Desempeño — acciones posibles',
+                        description: 'El botón de acción cambia según el avance del proceso:<br><br>' +
+                                     '<strong>Registrar</strong> — aún no hay sesión agendada. ' +
+                                     'Abre el asistente de 4 pasos:<br>' +
                                      ic('circle-number-1','#64748b') + ' Fecha y observaciones de la reunión<br>' +
-                                     ic('circle-number-2','#64748b') + ' Competencia a trabajar según calificaciones<br>' +
+                                     ic('circle-number-2','#64748b') + ' Competencia a trabajar según las calificaciones<br>' +
                                      ic('circle-number-3','#64748b') + ' Objetivo SMART sugerido por el sistema<br>' +
-                                     ic('circle-number-4','#64748b') + ' Firma digital del colaborador',
+                                     ic('circle-number-4','#64748b') + ' Firma digital del colaborador<br><br>' +
+                                     '<strong>Asignar Objetivos</strong> — la sesión ya está agendada. ' +
+                                     'Te lleva directo a los compromisos. Desde aquí también puedes ' +
+                                     '<strong>reagendar</strong> la reunión si la fecha cambió, ' +
+                                     'y el sistema enviará automáticamente una nueva notificación al colaborador.',
                         side: 'left', align: 'center'
                     }
                 });
             }
 
-            // ── 6. Tabla líderes — solo directores ──────────────────────────
-            if (tieneDir && document.querySelector('.fb-card:nth-of-type(2)')) {
+            // ── 6. Seguimiento post-firma ────────────────────────────────────
+            pasos.push({
+                popover: {
+                    title:       ic('chart-line') + ' Seguimiento de compromisos',
+                    description: 'Cuando el colaborador <strong>firma el recibido</strong>, el botón cambia ' +
+                                 'a <strong>Ver seguimiento</strong>. Desde ahí puedes:<br><br>' +
+                                 ic('circle-check','#15803d') + ' Revisar el estado actual de cada objetivo SMART<br>' +
+                                 ic('message-circle','#0058af') + ' Dejar comentarios sobre el avance<br>' +
+                                 ic('check','#15803d') + ' Marcar el compromiso como <strong>Aprobado</strong> ' +
+                                 'cuando el colaborador haya cumplido el objetivo<br><br>' +
+                                 'Este paso es la pieza clave del ciclo de mejora continua — sin él, los ' +
+                                 'objetivos quedan abiertos indefinidamente.',
+                    side: 'over', align: 'center'
+                }
+            });
+
+            // ── 7. Tabla líderes — solo directores (FL2) ────────────────────
+            if (tieneDir && document.getElementById('fb-card-fl2')) {
                 pasos.push({
-                    element: '.fb-card:nth-of-type(2)',
+                    element: '#fb-card-fl2',
                     popover: {
-                        title:       ic('crown') + ' Feedback a Líderes — Proceso 2',
+                        title:       ic('crown') + ' Flujo 2 · Liderazgo — feedback a líderes',
                         description: 'Como director, también das feedback a los líderes de tu área basado en ' +
                                      'las <strong>competencias de liderazgo P12-P16</strong> evaluadas ' +
-                                     'por sus propios colaboradores.',
+                                     'por sus propios colaboradores.<br><br>' +
+                                     'La columna <strong>Feedback</strong> muestra fecha y hora de la sesión registrada. ' +
+                                     'Al abrir el perfil de un líder encontrarás:<br><br>' +
+                                     ic('pencil','#6d28d9') + ' <strong>Editar agendamiento</strong> — ajusta o reagenda ' +
+                                     'la reunión; si la fecha cambia, el líder recibe una nueva notificación por correo.<br>' +
+                                     ic('chart-radar','#0891b2') + ' <strong>Ver consolidado</strong> — gráfico de radar con el ' +
+                                     'promedio grupal y las líneas individuales de cada colaborador que evaluó al líder, ' +
+                                     'así puedes comparar percepciones de forma anónima antes de la sesión.',
+                        side: 'top', align: 'start'
+                    }
+                });
+            }
+
+            // ── 8. Tabla EA — solo líderes funcionales con equipo asistencial ─
+            if (tieneEA && document.getElementById('fb-card-ea')) {
+                pasos.push({
+                    element: '#fb-card-ea',
+                    popover: {
+                        title:       ic('heart') + ' Flujo 3 · Experiencia Azul',
+                        description: 'Como líder, también das feedback al personal asistencial de tu área ' +
+                                     'en las <strong>competencias de servicio P17-P22</strong> ' +
+                                     '(Calidez, Comunicación, Trabajo en Equipo y otras).<br><br>' +
+                                     'El proceso funciona igual que el Flujo 1:<br>' +
+                                     ic('circle-number-1','#64748b') + ' Agenda la sesión (fecha, hora y observaciones)<br>' +
+                                     ic('circle-number-2','#64748b') + ' Revisa la competencia más débil<br>' +
+                                     ic('circle-number-3','#64748b') + ' Asigna el objetivo SMART de mejora<br>' +
+                                     ic('circle-number-4','#64748b') + ' El colaborador firma el recibido<br><br>' +
+                                     'Cuando ya hay una sesión registrada, el botón muestra ' +
+                                     '<strong>Asignar Objetivos</strong> y aparece ' +
+                                     '<strong>✎ Editar agendamiento</strong> en el modal ' +
+                                     'para reagendar si es necesario.',
                         side: 'top', align: 'start'
                     }
                 });
@@ -2820,6 +3781,967 @@ function iniciarTourFeedback() {
         });
 
         tour.drive();
+    });
+}
+
+
+// ══════════════════════════════════════════════════════
+// FLUJO 3 — Experiencia Azul (líder → colaborador asistencial, P17-P22)
+// ══════════════════════════════════════════════════════
+const EA_CAL_COLORS = {
+    5: {bg:'#ede9fe', color:'#5b21b6'},
+    4: {bg:'#d1fae5', color:'#065f46'},
+    3: {bg:'#dbeafe', color:'#1e40af'},
+    2: {bg:'#fef3c7', color:'#92400e'},
+    1: {bg:'#fee2e2', color:'#991b1b'},
+};
+
+let eaState = {
+    idEmpleado: null, nombre: '', cargo: '',
+    tieneFeedback: false, idFeedback: null,
+    cals: {}, compSel: null, calSel: '',
+    objSel: null, objData: null, acuerdosCount: 0, acuerdosComp: new Set(),
+};
+
+function abrirModalEA(idEmpleado, nombre, cargo, tieneFeedback, idFeedback, fecha, obs, totalAcuerdos, firmadoColab) {
+    if (FB_PERIODO_VENCIDO && !tieneFeedback) { _periodoVencidoSwal(); return; }
+    eaState = {
+        idEmpleado, nombre, cargo,
+        tieneFeedback: tieneFeedback == 1,
+        idFeedback: idFeedback || null,
+        cals: {}, compSel: null, calSel: '',
+        objSel: null, objData: null,
+        acuerdosCount: parseInt(totalAcuerdos) || 0,
+        acuerdosComp: new Set(),
+        firmado: parseInt(firmadoColab) || 0,
+    };
+    document.getElementById('fbEANombre').textContent = nombre;
+    document.getElementById('fbEACargo').textContent  = cargo;
+    document.getElementById('eaBtnEditarAgend').style.display =
+        (tieneFeedback == 1 && !parseInt(firmadoColab)) ? '' : 'none';
+    eaActualizarContador(eaState.acuerdosCount);
+
+    if (fecha) {
+        const [fechaPart, horaPart] = fecha.split(' ');
+        const parts = fechaPart ? fechaPart.split('/') : [];
+        if (parts.length === 3)
+            document.getElementById('eaFbFecha').value = parts[2] + '-' + parts[1] + '-' + parts[0];
+        if (horaPart)
+            document.getElementById('eaFbHora').value = horaPart;
+    }
+    document.getElementById('eaFbObs').value = obs || '';
+
+    const firmaNombreEl = document.getElementById('eaFirmaNombre');
+    if (firmaNombreEl) firmaNombreEl.textContent = nombre;
+
+    document.getElementById('fbEAModalOverlay').style.display = 'flex';
+
+    if (eaState.firmado) {
+        // Ya firmado: mostrar paso 4 como completado
+        document.getElementById('eaFormFirma').style.display  = 'none';
+        document.getElementById('eaFirmaOk').style.display    = '';
+        document.getElementById('eaBtnFirmar').style.display  = 'none';
+        const estadoElF = document.getElementById('eaEstadoFirma');
+        if (estadoElF) { estadoElF.textContent = '✓ Firmado'; estadoElF.style.color = '#0891b2'; }
+        eaIrPaso(4);
+        for (let s = 1; s <= 4; s++) {
+            const sc = document.getElementById('eaStepCircle' + s);
+            const sl = document.getElementById('eaStepLabel'  + s);
+            if (sc) { sc.className = 'fb-step-circle done'; sc.textContent = '✓'; }
+            if (sl) { sl.className = 'fb-step-label'; sl.style.color = 'rgba(255,255,255,0.8)'; }
+        }
+        for (let c = 1; c <= 3; c++) {
+            const conn = document.getElementById('eaStepConn' + c);
+            if (conn) conn.className = 'fb-step-connector done';
+        }
+        eaCargarSeguimiento();
+    } else if (eaState.tieneFeedback && eaState.acuerdosCount >= FB_MAX_OBJ) {
+        // Objetivos completos pero sin firma → ir directo a paso 4
+        const firmaNombreEl = document.getElementById('eaFirmaNombre');
+        if (firmaNombreEl) firmaNombreEl.textContent = eaState.nombre;
+        document.getElementById('eaFirmaCedula').value    = '';
+        document.getElementById('eaFirmaPassword').value  = '';
+        document.getElementById('eaFormFirma').style.display  = '';
+        document.getElementById('eaFirmaOk').style.display    = 'none';
+        document.getElementById('eaBtnFirmar').style.display  = '';
+        eaIrPaso(4);
+    } else if (eaState.tieneFeedback) {
+        eaCargarDatos();
+    } else {
+        // Sin feedback — pre-poblar fecha y hora actuales
+        const hoyEA = new Date();
+        const eaFechaEl = document.getElementById('eaFbFecha');
+        const eaHoraEl  = document.getElementById('eaFbHora');
+        if (eaFechaEl && !eaFechaEl.value) eaFechaEl.value = hoyEA.toISOString().split('T')[0];
+        if (eaHoraEl  && !eaHoraEl.value)  eaHoraEl.value  = hoyEA.toTimeString().slice(0, 5);
+        eaIrPaso(1);
+    }
+}
+
+function cerrarModalEA(recargar) {
+    document.getElementById('fbEAModalOverlay').style.display = 'none';
+    if (recargar || eaState.tieneFeedback) location.reload();
+}
+
+function eaIrPaso(p) {
+    document.getElementById('eaPasoFeedback').style.display = p === 1 ? 'block' : 'none';
+    document.getElementById('eaPasoComps').style.display    = p === 2 ? 'block' : 'none';
+    document.getElementById('eaPasoObjs').style.display     = p === 3 ? 'block' : 'none';
+    document.getElementById('eaPasoFirma').style.display    = p === 4 ? 'block' : 'none';
+
+    for (let i = 1; i <= 4; i++) {
+        const circle = document.getElementById('eaStepCircle' + i);
+        const label  = document.getElementById('eaStepLabel'  + i);
+        if (!circle) continue;
+        if (i < p) {
+            circle.className = 'fb-step-circle done'; circle.textContent = '✓';
+            label.className  = 'fb-step-label'; label.style.color = 'rgba(255,255,255,0.8)';
+        } else if (i === p) {
+            circle.className = 'fb-step-circle active'; circle.textContent = i;
+            label.className  = 'fb-step-label active'; label.style.color = '#fff';
+        } else {
+            circle.className = 'fb-step-circle pending'; circle.textContent = i;
+            label.className  = 'fb-step-label pending'; label.style.color = 'rgba(255,255,255,0.4)';
+        }
+        if (i <= 3) {
+            const conn = document.getElementById('eaStepConn' + i);
+            if (conn) conn.className = 'fb-step-connector' + (i < p ? ' done' : '');
+        }
+    }
+}
+
+function eaActualizarContador(n) {
+    const pill = document.getElementById('fbEACounterPill');
+    if (!pill) return;
+    pill.textContent = n + ' / ' + FB_MAX_OBJ + ' obj.';
+    pill.className   = 'fl2-counter-pill' + (n >= FB_MAX_OBJ ? ' lleno' : '');
+}
+
+function eaGuardarFeedback() {
+    if (FB_PERIODO_VENCIDO) { _periodoVencidoSwal(); return; }
+    const fecha = document.getElementById('eaFbFecha').value;
+    const hora  = document.getElementById('eaFbHora').value || '00:00';
+    const obs   = document.getElementById('eaFbObs').value.trim();
+    if (!fecha) {
+        Swal.fire({ icon:'warning', title:'Ingresa la fecha de la reunión',
+            showConfirmButton:false, timer:1800,
+            didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        return;
+    }
+    const [y, m, d] = fecha.split('-');
+    const fechaFmt  = d + '/' + m + '/' + y + ' ' + hora;
+    const btn = document.getElementById('eaBtnGuardarFb');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+
+    fetch(FB_APP_URL + 'feedback/', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-Requested-With':'XMLHttpRequest' },
+        body: new URLSearchParams({
+            action:        'registrarFeedbackEA',
+            idEmpleado:    eaState.idEmpleado,
+            fechaFeedback: fechaFmt,
+            observacion:   obs,
+        }).toString()
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false; btn.textContent = 'Guardar y continuar →';
+        if (res.ok) {
+            eaState.tieneFeedback = true;
+            if (res.idFeedback) eaState.idFeedback = res.idFeedback;
+            Swal.fire({
+                icon: 'success', title: '¡Feedback registrado!',
+                html: 'La reuni&oacute;n fue registrada.<br>Ahora asigna los objetivos de Experiencia Azul.',
+                confirmButtonColor: '#0891b2', confirmButtonText: 'Asignar objetivos',
+                showDenyButton: true, denyButtonText: 'Despu&eacute;s', denyButtonColor: '#64748b',
+                allowOutsideClick: false,
+                didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; }
+            }).then(r => {
+                if (r.isConfirmed) eaCargarDatos();
+                else cerrarModalEA(true);
+            });
+        } else {
+            Swal.fire({ icon:'error', title:'Error al guardar el feedback',
+                showConfirmButton:false, timer:1800,
+                didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        }
+    });
+}
+
+function eaCargarDatos() {
+    eaIrPaso(2);
+    document.getElementById('eaGridComps').innerHTML =
+        '<div style="padding:32px;text-align:center;color:var(--fb-muted);">' +
+        '<div style="width:28px;height:28px;border:3px solid #e2e8f0;border-top-color:#0058af;' +
+        'border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px;"></div>' +
+        'Cargando calificaciones EA...</div>';
+
+    Promise.all([
+        fetch(FB_APP_URL + 'feedback/?action=getCalificacionesEA&idEmpleado=' + eaState.idEmpleado, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json()),
+        fetch(FB_APP_URL + 'feedback/?action=getAcuerdos&idEmpleado=' + eaState.idEmpleado + '&flujo=3', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(r => r.json())
+    ]).then(([calsData, acuerdos]) => {
+        eaState.cals         = { auto: calsData.auto || {}, lider: calsData.lider || {} };
+        eaState.acuerdosCount = acuerdos.length;
+        eaState.acuerdosComp  = new Set(acuerdos.map(a => parseInt(a.NUM_COMPETENCIA)));
+        eaActualizarContador(acuerdos.length);
+        eaRenderCompetencias();
+    });
+}
+
+function eaRenderCompetencias() {
+    const grid = document.getElementById('eaGridComps');
+    if (!grid) return;
+    const autoData  = eaState.cals.auto  || {};
+    const liderData = eaState.cals.lider || {};
+    const maximo    = eaState.acuerdosCount >= FB_MAX_OBJ;
+
+    if (!Object.keys(autoData).length && !Object.keys(liderData).length) {
+        grid.innerHTML = '<div style="text-align:center;padding:36px;color:var(--fb-muted);">' +
+            '<div style="font-size:2rem;margin-bottom:10px;">⚠</div>' +
+            '<div style="font-weight:700;font-size:.92rem;color:#1e3a5f;">Sin calificaciones EA</div>' +
+            '<div style="font-size:.82rem;margin-top:8px;max-width:320px;margin:8px auto 0;line-height:1.5;color:#64748b;">' +
+            'El colaborador aún no ha completado su autoevaluación EA o tú no has completado la evaluación EA.</div></div>';
+        return;
+    }
+
+    // Usar solo la calificación del líder (no hay autoevaluación EA)
+    let html = '';
+    for (let p = 17; p <= 22; p++) {
+        const lKey     = 'PREGUNTA' + p;
+        const calLabel = liderData[lKey] || '';
+        if (!calLabel) continue;
+        const nombre   = FB_COMP_NAMES[p] || 'P' + p;
+        const asignada = eaState.acuerdosComp.has(p);
+        const bloqueada = maximo && !asignada;
+
+        const labelToVal = { 'Referente':5,'Consistente':4,'Esperado':3,'Inconsistente':2,'Crítico':1 };
+        const lVal  = labelToVal[calLabel] || 3;
+        const colors = EA_CAL_COLORS[lVal] || {bg:'#f1f5f9', color:'#64748b'};
+
+        html += `<div class="fl2-comp-row${asignada ? ' asignada' : ''}"
+            ${!asignada && !bloqueada ? `data-comp="${p}" data-cal="${fbEscapeJs(calLabel)}"` : ''}
+            style="${bloqueada ? 'opacity:.45;cursor:not-allowed;' : ''}">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <div style="width:36px;height:36px;border-radius:10px;
+                            background:${asignada ? '#dcfce7' : 'linear-gradient(135deg,#cffafe,#a5f3fc)'};
+                            display:flex;align-items:center;justify-content:center;font-size:.72rem;
+                            font-weight:800;color:${asignada ? '#15803d' : '#0c4a6e'};flex-shrink:0;">
+                    P${p}
+                </div>
+                <div>
+                    <div style="font-weight:700;font-size:.88rem;color:#1e293b;">${nombre}</div>
+                    <div style="font-size:.72rem;color:var(--fb-muted);">Tu evaluación como líder EA</div>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                <span style="background:${colors.bg};color:${colors.color};padding:3px 12px;
+                             border-radius:20px;font-size:.72rem;font-weight:700;">${calLabel}</span>
+                ${asignada
+                    ? '<span style="background:#dcfce7;color:#15803d;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:700;">✓ Asignado</span>'
+                    : bloqueada
+                        ? '<span style="font-size:.72rem;color:#94a3b8;">Máx. alcanzado</span>'
+                        : '<span style="color:#0891b2;font-size:.78rem;font-weight:600;">Ver objetivos →</span>'
+                }
+            </div>
+        </div>`;
+    }
+
+    grid.innerHTML = html || '<div style="padding:24px;text-align:center;color:var(--fb-muted);">Sin competencias EA evaluadas.</div>';
+    grid.querySelectorAll('.fl2-comp-row[data-comp]').forEach(row => {
+        row.addEventListener('click', () => {
+            eaSelCompetencia(parseInt(row.dataset.comp), row.dataset.cal);
+        });
+    });
+}
+
+function eaSelCompetencia(numComp, calLabel) {
+    eaState.compSel = numComp;
+    eaState.calSel  = calLabel;
+    eaState.objSel  = null;
+    eaState.objData = null;
+    document.getElementById('eaCompLabel').textContent =
+        (FB_COMP_NAMES[numComp] || 'P' + numComp) + ' · ' + calLabel;
+    eaIrPaso(3);
+    const grid = document.getElementById('eaGridObjs');
+    grid.innerHTML = '<div style="padding:24px;text-align:center;color:var(--fb-muted);">Cargando objetivos...</div>';
+    fetch(FB_APP_URL + 'feedback/?action=getObjetivos&numComp=' + numComp + '&calificacion=' + encodeURIComponent(calLabel), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(objs => {
+        if (!objs.length) {
+            grid.innerHTML = '<div style="padding:24px;text-align:center;color:var(--fb-muted);">No hay objetivos disponibles para esta calificación.</div>';
+            return;
+        }
+        let h = '';
+        objs.forEach(obj => {
+            h += `<div class="fl2-obj-wrap" id="eaObj_${obj.IDOBJETIVO}">
+                <div class="fl2-obj-head" onclick="eaToggleObj(${obj.IDOBJETIVO}, this)">
+                    <div class="fl2-obj-toggle" id="eaObjDot_${obj.IDOBJETIVO}"></div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:.7rem;font-weight:700;color:#0058af;text-transform:uppercase;
+                                    letter-spacing:.06em;margin-bottom:3px;">${obj.MODELO}</div>
+                        <div style="font-size:.83rem;color:#1e293b;line-height:1.5;">${obj.OBJETIVO}</div>
+                    </div>
+                    <div style="font-size:.8rem;color:#94a3b8;flex-shrink:0;">&#9660;</div>
+                </div>
+                <div class="fl2-obj-body" id="eaObjBody_${obj.IDOBJETIVO}">
+                    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;
+                                padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:#0369a1;line-height:1.6;">
+                        ${obj.INDICADOR ? '<strong>Indicador sugerido:</strong> ' + obj.INDICADOR + '<br>' : ''}
+                        ${obj.META      ? '<strong>Meta sugerida:</strong> '      + obj.META      + '<br>' : ''}
+                        ${obj.PLAZO     ? '<strong>Plazo sugerido:</strong> '     + obj.PLAZO             : ''}
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <label class="fl2-field-label">Indicador</label>
+                            <input class="fl2-input" id="eaInd_${obj.IDOBJETIVO}" type="text"
+                                   value="${fbEscapeJs(obj.INDICADOR||'')}" placeholder="¿Cómo se medirá el avance?"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
+                        </div>
+                        <div>
+                            <label class="fl2-field-label">Meta</label>
+                            <input class="fl2-input" id="eaMet_${obj.IDOBJETIVO}" type="text"
+                                   value="${fbEscapeJs(obj.META||'')}" placeholder="Resultado esperado"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+                        <div>
+                            <label class="fl2-field-label">Plazo</label>
+                            <input class="fl2-input" id="eaPlz_${obj.IDOBJETIVO}" type="text"
+                                   value="${fbEscapeJs(obj.PLAZO||'')}" placeholder="Ej: 12 meses"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
+                        </div>
+                        <div>
+                            <label class="fl2-field-label">Evidencia</label>
+                            <input class="fl2-input" id="eaEvi_${obj.IDOBJETIVO}" type="text"
+                                   value="${fbEscapeJs(obj.EVIDENCIA||'')}" placeholder="¿Cómo se demostrará?"
+                                   readonly style="background:#f8fafc;cursor:default;color:#475569;">
+                        </div>
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label class="fl2-field-label">Seguimiento sugerido</label>
+                        <input class="fl2-input" id="eaSeg_${obj.IDOBJETIVO}" type="text"
+                               value="${fbEscapeJs(obj.SEGUIMIENTO||'')}" placeholder="Ej: Mensual, Trimestral..."
+                               readonly style="background:#f8fafc;cursor:default;color:#475569;">
+                    </div>
+                    <div style="margin-bottom:12px;">
+                        <label class="fl2-field-label">Apoyo del líder</label>
+                        <textarea class="fl2-input" id="eaApo_${obj.IDOBJETIVO}" rows="2"
+                                  style="resize:vertical;"
+                                  placeholder="Define el acompañamiento, formación, recursos, autoridad o espacio de seguimiento que debes aportar para viabilizar este compromiso."></textarea>
+                    </div>
+                    <div style="margin-bottom:4px;">
+                        <label class="fl2-field-label">Compromiso ajustado</label>
+                        <textarea class="fl2-input" id="eaCom_${obj.IDOBJETIVO}" rows="2"
+                                  style="resize:vertical;"
+                                  placeholder="Compromiso final acordado..."></textarea>
+                    </div>
+                </div>
+            </div>`;
+        });
+        grid.innerHTML = h;
+    });
+}
+
+function eaToggleObj(idObj) {
+    document.querySelectorAll('#eaGridObjs .fl2-obj-wrap').forEach(w => w.classList.remove('selected'));
+    document.querySelectorAll('#eaGridObjs .fl2-obj-body').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('#eaGridObjs .fl2-obj-toggle').forEach(d => { d.innerHTML = ''; });
+    const wrap = document.getElementById('eaObj_' + idObj);
+    const body = document.getElementById('eaObjBody_' + idObj);
+    const dot  = document.getElementById('eaObjDot_' + idObj);
+    wrap.classList.add('selected');
+    body.classList.add('open');
+    dot.innerHTML = '✓';
+    eaState.objSel = idObj;
+}
+
+function eaAsignarObjetivo() {
+    if (!eaState.idEmpleado || !eaState.compSel || !eaState.objSel) {
+        Swal.fire({ icon:'warning', title:'Selecciona un objetivo', showConfirmButton:false, timer:1800 });
+        return;
+    }
+    if (eaState.acuerdosCount >= FB_MAX_OBJ) {
+        Swal.fire({ icon:'warning', title:'Límite alcanzado',
+            text: 'Ya se asignaron ' + FB_MAX_OBJ + ' objetivos a este colaborador.',
+            confirmButtonColor:'#0891b2' });
+        return;
+    }
+    const idObj = eaState.objSel;
+    const apoyo = document.getElementById('eaApo_' + idObj)?.value.trim() || '';
+    if (!apoyo) {
+        Swal.fire({ icon:'warning', title:'Campo requerido',
+            text: 'El apoyo del líder es obligatorio.',
+            confirmButtonColor:'#0891b2',
+            didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        return;
+    }
+    const btn = document.getElementById('eaBtnAsignar');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+
+    const body  = new URLSearchParams({
+        action:       'asignarObjetivo',
+        idEmpleado:   eaState.idEmpleado,
+        idObjetivo:   idObj,
+        numComp:      eaState.compSel,
+        calificacion: eaState.calSel,
+        idFeedback:   eaState.idFeedback || 0,
+        apoyo,
+        indicador:    document.getElementById('eaInd_' + idObj)?.value || '',
+        meta:         document.getElementById('eaMet_' + idObj)?.value || '',
+        plazo:        document.getElementById('eaPlz_' + idObj)?.value || '',
+        evidencia:    document.getElementById('eaEvi_' + idObj)?.value || '',
+        seguimiento:  document.getElementById('eaSeg_' + idObj)?.value || '',
+        compromiso:   document.getElementById('eaCom_' + idObj)?.value || '',
+    });
+
+    fetch(FB_APP_URL + 'feedback/', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-Requested-With':'XMLHttpRequest' },
+        body: body.toString()
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false; btn.textContent = '✓ Asignar Objetivo';
+        if (res.ok) {
+            eaState.acuerdosCount++;
+            eaState.acuerdosComp.add(eaState.compSel);
+            eaActualizarContador(eaState.acuerdosCount);
+            const quedan = FB_MAX_OBJ - eaState.acuerdosCount;
+            if (quedan > 0) {
+                Swal.fire({
+                    icon:'success', title:'¡Objetivo asignado!',
+                    text: 'Puedes asignar ' + quedan + ' objetivo(s) más a este colaborador.',
+                    confirmButtonColor:'#0891b2', confirmButtonText:'Asignar otro',
+                    didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; }
+                }).then(() => { eaIrPaso(2); eaRenderCompetencias(); });
+            } else {
+                Swal.fire({
+                    icon:'success', title:'¡Objetivos completados!',
+                    html: 'Se asignaron los <strong>' + FB_MAX_OBJ + '</strong> objetivos de Experiencia Azul.<br>' +
+                          '<span style="font-size:.85rem;color:#475569;">El colaborador debe firmar la conformidad.</span>',
+                    confirmButtonColor:'#0891b2', confirmButtonText:'&#9998; Ir a firma',
+                    showDenyButton: true, denyButtonText: 'Firmar después', denyButtonColor: '#64748b',
+                    allowOutsideClick: false,
+                    didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; }
+                }).then(r => {
+                    if (r.isDenied) { cerrarModalEA(true); return; }
+                    const firmaNombreEl = document.getElementById('eaFirmaNombre');
+                    if (firmaNombreEl) firmaNombreEl.textContent = eaState.nombre;
+                    document.getElementById('eaFirmaCedula').value    = '';
+                    document.getElementById('eaFirmaPassword').value  = '';
+                    document.getElementById('eaFormFirma').style.display  = '';
+                    document.getElementById('eaFirmaOk').style.display    = 'none';
+                    document.getElementById('eaBtnFirmar').style.display  = '';
+                    eaIrPaso(4);
+                });
+            }
+        } else {
+            Swal.fire({ icon:'error', title: res.msg || 'Error al asignar objetivo',
+                confirmButtonColor:'#0891b2',
+                didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        }
+    });
+}
+
+function eaFirmar() {
+    const cedula   = document.getElementById('eaFirmaCedula')?.value.trim()   || '';
+    const password = document.getElementById('eaFirmaPassword')?.value.trim() || '';
+    if (!cedula || !password) {
+        Swal.fire({ icon:'warning', title:'Completa los datos',
+            text: 'Ingresa la cédula y contraseña del colaborador.',
+            confirmButtonColor:'#0891b2',
+            didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        return;
+    }
+    const btn = document.getElementById('eaBtnFirmar');
+    btn.disabled = true; btn.textContent = 'Verificando...';
+
+    fetch(FB_APP_URL + 'feedback/', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/x-www-form-urlencoded', 'X-Requested-With':'XMLHttpRequest' },
+        body: new URLSearchParams({
+            action:     'firmarFeedbackEA',
+            idEmpleado: eaState.idEmpleado,
+            cedula,
+            password,
+        }).toString()
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false; btn.textContent = '✎ Firmar conformidad';
+        if (res.ok) {
+            document.getElementById('eaFormFirma').style.display = 'none';
+            document.getElementById('eaFirmaOk').style.display   = '';
+            btn.style.display = 'none';
+            const estadoEl = document.getElementById('eaEstadoFirma');
+            if (estadoEl) { estadoEl.textContent = '✓ Firmado'; estadoEl.style.color = '#0891b2'; }
+            // Actualizar panel colaborador visualmente
+            const panelColab = document.querySelector('#eaPasoFirma [style*="background:#f8fafc"]');
+            if (panelColab) { panelColab.style.background = '#ecfdf5'; panelColab.style.borderColor = '#6ee7b7'; }
+            for (let s = 1; s <= 4; s++) {
+                const sc = document.getElementById('eaStepCircle' + s);
+                const sl = document.getElementById('eaStepLabel'  + s);
+                if (sc) { sc.className = 'fb-step-circle done'; sc.textContent = '✓'; }
+                if (sl) { sl.className = 'fb-step-label'; sl.style.color = 'rgba(255,255,255,0.8)'; }
+            }
+            for (let c = 1; c <= 3; c++) {
+                const conn = document.getElementById('eaStepConn' + c);
+                if (conn) conn.className = 'fb-step-connector done';
+            }
+            Swal.fire({
+                icon: 'success', title: '¡Firma registrada!',
+                html: 'Los objetivos de Experiencia Azul están activos.<br>' +
+                      '<span style="font-size:.85rem;color:#475569;">El colaborador podrá ver su plan de mejora.</span>',
+                confirmButtonColor: '#0891b2', confirmButtonText: 'Cerrar',
+                allowOutsideClick: false,
+                didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; }
+            }).then(() => cerrarModalEA(true));
+        } else {
+            Swal.fire({ icon:'error', title:'Error al firmar',
+                text: res.msg || 'Credenciales incorrectas o error del sistema.',
+                confirmButtonColor:'#0891b2',
+                didOpen: () => { document.querySelector('.swal2-container').style.zIndex = '99999'; } });
+        }
+    });
+}
+
+// Bloquear ESC en modal EA también
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('fbEAModalOverlay')?.style.display === 'flex') {
+        e.preventDefault();
+    }
+});
+
+// ══ MODAL CONSOLIDADO ════════════════════════════════════════════════════════
+const CONS_CAL_COLORS = {
+    1: {bg:'#fef2f2',color:'#991b1b',dot:'#ef4444'},
+    2: {bg:'#fff7ed',color:'#92400e',dot:'#f97316'},
+    3: {bg:'#fefce8',color:'#854d0e',dot:'#eab308'},
+    4: {bg:'#eff6ff',color:'#1e40af',dot:'#3b82f6'},
+    5: {bg:'#f0fdf4',color:'#166534',dot:'#22c55e'},
+};
+
+function abrirConsolidado(idEmpleado, nombre) {
+    const overlay = document.getElementById('fbConsolidadoOverlay');
+    consShowTab('datos');
+    document.getElementById('fbConsNombre').textContent = nombre;
+    document.getElementById('fbConsSubtitle').textContent = 'Consolidado de evaluación — Flujo 1 · P1 a P11';
+    document.getElementById('fbConsAutoBadge').style.display = 'none';
+    document.getElementById('fbConsAutoBadge').textContent = 'Con autoevaluación';
+    document.getElementById('fbConsAutoBadge').style.background = 'rgba(255,255,255,.15)';
+    document.getElementById('fbConsAutoBadge').style.color = '#fff';
+    document.getElementById('fbConsCol2').textContent = 'Tu evaluación';
+    document.getElementById('fbConsCol2').style.color = '#0058af';
+    document.getElementById('fbConsAutoCol').style.display = '';
+    document.getElementById('fbConsBody').innerHTML =
+        '<div style="text-align:center;padding:48px;color:#94a3b8;font-size:.85rem;">Cargando datos...</div>';
+    overlay.style.display = 'flex';
+
+    fetch(FB_APP_URL + 'feedback/?action=getConsolidadoColaborador&idEmpleado=' + idEmpleado, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const comps = data.competencias || [];
+        const tieneAuto = data.tieneAuto;
+
+        // Mostrar/ocultar badge y columna auto
+        if (tieneAuto) document.getElementById('fbConsAutoBadge').style.display = '';
+        document.getElementById('fbConsAutoCol').style.display = tieneAuto ? '' : 'none';
+        // Ajustar grid según columnas
+        document.getElementById('fbConsLeyenda').style.gridTemplateColumns = tieneAuto ? '1fr 1fr 1fr' : '2fr 1fr';
+
+        if (!comps.length) {
+            document.getElementById('fbConsBody').innerHTML =
+                '<div style="text-align:center;padding:48px;color:#94a3b8;">Sin evaluaciones registradas para este período.</div>';
+            return;
+        }
+
+        let html = '';
+        comps.forEach(c => {
+            const lc  = CONS_CAL_COLORS[c.lider?.valor] || {bg:'#f1f5f9',color:'#64748b',dot:'#94a3b8'};
+            const ac  = CONS_CAL_COLORS[c.auto?.valor]  || {bg:'#f1f5f9',color:'#64748b',dot:'#94a3b8'};
+            const dif = c.lider && c.auto ? c.lider.valor - c.auto.valor : null;
+            const difHtml = dif !== null
+                ? `<span style="font-size:.68rem;margin-left:5px;color:${dif > 0 ? '#dc2626' : dif < 0 ? '#2563eb' : '#94a3b8'};">
+                       ${dif > 0 ? '↑ +' + dif : dif < 0 ? '↓ ' + dif : '= igual'}
+                   </span>`
+                : '';
+
+            const justLiderHtml = c.justLider
+                ? `<div class="cons-just" style="display:none;background:#fffbeb;border:1px solid #fde68a;
+                            border-radius:7px;padding:8px 12px;margin-top:6px;font-size:.76rem;
+                            color:#92400e;line-height:1.5;">
+                       <strong>Justificación (tu evaluación):</strong><br>${c.justLider}
+                   </div>
+                   <button onclick="this.previousElementSibling.style.display=this.previousElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Ver')?'Ocultar justificación':'Ver justificación'"
+                       style="font-size:.7rem;color:#b45309;background:none;border:none;cursor:pointer;
+                              padding:2px 0;margin-top:4px;">
+                       Ver justificación
+                   </button>`
+                : '';
+
+            const justAutoHtml = c.justAuto
+                ? `<div class="cons-just" style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;
+                            border-radius:7px;padding:8px 12px;margin-top:6px;font-size:.76rem;
+                            color:#5b21b6;line-height:1.5;">
+                       <strong>Justificación (autoevaluación):</strong><br>${c.justAuto}
+                   </div>
+                   <button onclick="this.previousElementSibling.style.display=this.previousElementSibling.style.display==='none'?'block':'none';this.textContent=this.textContent.includes('Ver')?'Ocultar justificación':'Ver justificación'"
+                       style="font-size:.7rem;color:#6d28d9;background:none;border:none;cursor:pointer;
+                              padding:2px 0;margin-top:4px;">
+                       Ver justificación
+                   </button>`
+                : '';
+
+            html += `<div style="display:grid;grid-template-columns:${tieneAuto ? '1fr 1fr 1fr' : '2fr 1fr'};
+                                 border-bottom:1px solid #f1f5f9;">
+                <!-- Competencia -->
+                <div style="padding:12px 16px;display:flex;align-items:flex-start;gap:8px;">
+                    <div style="width:22px;height:22px;border-radius:6px;background:#e2e8f0;
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:.65rem;font-weight:800;color:#475569;flex-shrink:0;margin-top:1px;">
+                        P${c.num}
+                    </div>
+                    <div style="font-size:.82rem;font-weight:600;color:#1e293b;line-height:1.3;">${c.nombre}</div>
+                </div>
+                <!-- Calificación líder -->
+                <div style="padding:12px 16px;border-left:1px solid #f1f5f9;">
+                    ${c.lider
+                        ? `<div style="display:inline-flex;align-items:center;gap:5px;
+                                background:${lc.bg};color:${lc.color};padding:4px 10px;
+                                border-radius:20px;font-size:.75rem;font-weight:700;">
+                               <span style="width:7px;height:7px;border-radius:50%;background:${lc.dot};"></span>
+                               ${c.lider.etiqueta}${difHtml}
+                           </div>
+                           ${justLiderHtml}`
+                        : '<span style="color:#94a3b8;font-size:.78rem;">Sin evaluar</span>'
+                    }
+                </div>
+                <!-- Autoevaluación -->
+                ${tieneAuto ? `<div style="padding:12px 16px;border-left:1px solid #f1f5f9;">
+                    ${c.auto
+                        ? `<div style="display:inline-flex;align-items:center;gap:5px;
+                                background:${ac.bg};color:${ac.color};padding:4px 10px;
+                                border-radius:20px;font-size:.75rem;font-weight:700;">
+                               <span style="width:7px;height:7px;border-radius:50%;background:${ac.dot};"></span>
+                               ${c.auto.etiqueta}
+                           </div>
+                           ${justAutoHtml}`
+                        : '<span style="color:#94a3b8;font-size:.78rem;">No respondida</span>'
+                    }
+                </div>` : ''}
+            </div>`;
+        });
+        document.getElementById('fbConsBody').innerHTML = html;
+
+        // Construir datos para radar chart
+        const chartLabels   = comps.map(c => c.nombre);
+        const liderVals     = comps.map(c => c.lider?.valor ?? 0);
+        const chartDatasets = [{
+            label: 'Tu evaluación',
+            data: liderVals,
+            backgroundColor: 'rgba(0,88,175,.12)',
+            borderColor: '#0058af',
+            borderWidth: 2,
+            pointBackgroundColor: '#0058af',
+            pointRadius: 4,
+            pointHoverRadius: 6,
+        }];
+        if (tieneAuto) {
+            chartDatasets.push({
+                label: 'Autoevaluación',
+                data: comps.map(c => c.auto?.valor ?? 0),
+                backgroundColor: 'rgba(124,58,237,.1)',
+                borderColor: '#7c3aed',
+                borderWidth: 2,
+                pointBackgroundColor: '#7c3aed',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            });
+        }
+        _consRenderChart(chartLabels, chartDatasets);
+    })
+    .catch(() => {
+        document.getElementById('fbConsBody').innerHTML =
+            '<div style="text-align:center;padding:48px;color:#ef4444;">Error al cargar los datos.</div>';
+    });
+}
+
+function cerrarConsolidado() {
+    document.getElementById('fbConsolidadoOverlay').style.display = 'none';
+}
+
+/* ── Tabs del modal consolidado ── */
+function consShowTab(tab) {
+    const isDatos = tab === 'datos';
+    document.getElementById('fbConsLeyenda').style.display    = isDatos ? 'grid' : 'none';
+    document.getElementById('fbConsBody').style.display       = isDatos ? 'block' : 'none';
+    document.getElementById('fbConsChartWrap').style.display  = isDatos ? 'none' : 'block';
+
+    const tDatos   = document.getElementById('fbConsTabDatos');
+    const tGrafica = document.getElementById('fbConsTabGrafica');
+    tDatos.style.color         = isDatos ? '#0058af' : '#94a3b8';
+    tDatos.style.borderBottom  = isDatos ? '2px solid #0058af' : '2px solid transparent';
+    tGrafica.style.color       = isDatos ? '#94a3b8' : '#0058af';
+    tGrafica.style.borderBottom= isDatos ? '2px solid transparent' : '2px solid #0058af';
+}
+
+/* ── Radar chart del modal consolidado ── */
+let fbConsChartInst = null;
+
+function _consRenderChart(labels, datasets) {
+    if (fbConsChartInst) {
+        fbConsChartInst.destroy();
+        fbConsChartInst = null;
+    }
+    const ctx = document.getElementById('fbConsChart').getContext('2d');
+    const etiquetasEscala = {1:'Insuf.',2:'R.Mejora',3:'Aceptable',4:'Acorde',5:'Sobresaliente'};
+
+    fbConsChartInst = new Chart(ctx, {
+        type: 'radar',
+        data: { labels, datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        font: { size: 11, family: "'Plus Jakarta Sans', sans-serif" },
+                        color: '#475569',
+                        padding: 16,
+                        usePointStyle: true,
+                        pointStyleWidth: 8,
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const v = ctx.raw;
+                            return ` ${ctx.dataset.label}: ${v} — ${etiquetasEscala[v] || v}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                r: {
+                    min: 0, max: 5,
+                    ticks: {
+                        stepSize: 1,
+                        font: { size: 9 },
+                        color: '#94a3b8',
+                        backdropColor: 'transparent',
+                        callback: v => v > 0 ? v : ''
+                    },
+                    grid: { color: '#e2e8f0' },
+                    angleLines: { color: '#e2e8f0' },
+                    pointLabels: {
+                        font: { size: 10.5, weight: '600', family: "'Plus Jakarta Sans', sans-serif" },
+                        color: '#334155',
+                        callback: label => label.length > 14 ? label.substring(0, 13) + '…' : label
+                    }
+                }
+            }
+        }
+    });
+}
+
+/* ── helper: renderiza fila de competencia (Flujo 2 y 3, sin columna auto) ── */
+function _consRenderFila(num, nombre, valor, etiqueta, justificacion, justContexto = '') {
+    const cl = CONS_CAL_COLORS[valor] || {bg:'#f1f5f9',color:'#64748b',dot:'#94a3b8'};
+    // justificacion llega como array desde el backend
+    const justs = Array.isArray(justificacion)
+        ? justificacion.filter(j => j && j.trim())
+        : (justificacion ? [justificacion] : []);
+    const btnLabel = 'Ver justificación' + (justContexto ? ` (${justContexto})` : '');
+    const justHtml = justs.length > 0
+        ? `<div class="cons-just" style="display:none;background:#fffbeb;border:1px solid #fde68a;
+                    border-radius:7px;padding:8px 12px;margin-top:6px;font-size:.76rem;
+                    color:#92400e;line-height:1.5;">
+               <strong>Justificación${justs.length > 1 ? 'es' : ''}:</strong>
+               ${justs.map((j, i) => `
+                   ${i > 0 ? '<hr style="border:none;border-top:1px dashed #fde68a;margin:6px 0;">' : ''}
+                   ${justs.length > 1 ? `<span style="font-size:.68rem;font-weight:700;color:#b45309;display:block;margin-bottom:2px;margin-top:${i>0?'2px':'4px'};">Evaluador ${i+1}</span>` : ''}
+                   <span>${j}</span>
+               `).join('')}
+           </div>
+           <button data-label="${btnLabel.replace(/"/g,'&quot;')}"
+               onclick="const j=this.previousElementSibling;const open=j.style.display==='none';j.style.display=open?'block':'none';this.textContent=open?'Ocultar justificación':this.dataset.label;"
+               style="font-size:.7rem;color:#b45309;background:none;border:none;cursor:pointer;
+                      padding:2px 0;margin-top:4px;">
+               ${btnLabel}
+           </button>`
+        : '';
+    return `<div style="display:grid;grid-template-columns:2fr 1fr;border-bottom:1px solid #f1f5f9;">
+        <div style="padding:12px 16px;display:flex;align-items:flex-start;gap:8px;">
+            <div style="width:22px;height:22px;border-radius:6px;background:#e2e8f0;
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:.65rem;font-weight:800;color:#475569;flex-shrink:0;margin-top:1px;">
+                P${num}
+            </div>
+            <div>
+                <div style="font-size:.82rem;font-weight:600;color:#1e293b;line-height:1.3;">${nombre}</div>
+                ${justHtml}
+            </div>
+        </div>
+        <div style="padding:12px 16px;border-left:1px solid #f1f5f9;">
+            <div style="display:inline-flex;align-items:center;gap:5px;
+                    background:${cl.bg};color:${cl.color};padding:4px 10px;
+                    border-radius:20px;font-size:.75rem;font-weight:700;">
+                <span style="width:7px;height:7px;border-radius:50%;background:${cl.dot};"></span>
+                ${etiqueta}
+            </div>
+        </div>
+    </div>`;
+}
+
+/* ── Consolidado Flujo 2: ponderado evaluaciones de colaboradores al líder ── */
+function abrirConsolidadoL2(idLider, nombre) {
+    const overlay = document.getElementById('fbConsolidadoOverlay');
+    overlay.style.display = 'flex';
+    consShowTab('datos');
+
+    document.getElementById('fbConsNombre').textContent = nombre;
+    document.getElementById('fbConsSubtitle').textContent = 'Flujo 2 · Ponderado P12 a P16';
+    const badge = document.getElementById('fbConsAutoBadge');
+    badge.textContent = 'Ponderado colaboradores';
+    badge.style.background = 'rgba(6,182,212,.18)';
+    badge.style.color = '#cffafe';
+    badge.style.display = '';
+    document.getElementById('fbConsCol2').textContent = 'Calificación promedio';
+    document.getElementById('fbConsCol2').style.color = '#0891b2';
+    document.getElementById('fbConsAutoCol').style.display = 'none';
+    document.getElementById('fbConsLeyenda').style.gridTemplateColumns = '2fr 1fr';
+
+    document.getElementById('fbConsBody').innerHTML =
+        '<div style="text-align:center;padding:48px;color:#94a3b8;font-size:.85rem;">Cargando datos...</div>';
+
+    fetch(FB_APP_URL + 'feedback/?action=getConsolidadoLider&idLider=' + idLider, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const comps = data.competencias || [];
+        if (!comps.length) {
+            document.getElementById('fbConsBody').innerHTML =
+                '<div style="text-align:center;padding:48px;color:#94a3b8;">Sin evaluaciones registradas.</div>';
+            return;
+        }
+        let html = '';
+        comps.forEach(c => { html += _consRenderFila(c.num, c.nombre, c.valor, c.etiqueta, c.justificacion, c.justContexto || ''); });
+        document.getElementById('fbConsBody').innerHTML = html;
+
+        const individuales = data.individuales || [];
+        const datasets = [];
+
+        // Líneas individuales — tenues, sin relleno, una por colaborador
+        const paleta = [
+            'rgba(148,163,184,.55)', // slate
+            'rgba(167,139,250,.55)', // violet
+            'rgba(52,211,153,.55)',  // emerald
+            'rgba(251,191,36,.55)',  // amber
+            'rgba(248,113,113,.55)', // red
+            'rgba(96,165,250,.55)',  // blue
+        ];
+        individuales.forEach((col, i) => {
+            const color = paleta[i % paleta.length];
+            datasets.push({
+                label: col.label,
+                data: col.valores,
+                backgroundColor: 'transparent',
+                borderColor: color,
+                borderWidth: 1.5,
+                borderDash: [4, 3],
+                pointBackgroundColor: color,
+                pointRadius: 3,
+                pointHoverRadius: 5,
+                spanGaps: true,
+                order: 2,
+            });
+        });
+
+        // Línea del promedio — prominente, encima de las individuales
+        datasets.push({
+            label: 'Promedio colaboradores',
+            data: comps.map(c => c.valor),
+            backgroundColor: 'rgba(8,145,178,.06)',
+            borderColor: '#0891b2',
+            borderWidth: 2.5,
+            pointBackgroundColor: '#0891b2',
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            order: 1,
+        });
+
+        _consRenderChart(comps.map(c => c.nombre), datasets);
+    })
+    .catch(() => {
+        document.getElementById('fbConsBody').innerHTML =
+            '<div style="text-align:center;padding:48px;color:#ef4444;">Error al cargar los datos.</div>';
+    });
+}
+
+/* ── Consolidado Flujo 3 EA: evaluación del líder al colaborador (P17-P22) ── */
+function abrirConsolidadoEA(idEmpleado, nombre) {
+    const overlay = document.getElementById('fbConsolidadoOverlay');
+    overlay.style.display = 'flex';
+    consShowTab('datos');
+
+    document.getElementById('fbConsNombre').textContent = nombre;
+    document.getElementById('fbConsSubtitle').textContent = 'Flujo 3 EA · Calificaciones P17 a P22';
+    const badge = document.getElementById('fbConsAutoBadge');
+    badge.textContent = 'Evaluación EA';
+    badge.style.background = 'rgba(139,92,246,.18)';
+    badge.style.color = '#e9d5ff';
+    badge.style.display = '';
+    document.getElementById('fbConsCol2').textContent = 'Calificación EA';
+    document.getElementById('fbConsCol2').style.color = '#7c3aed';
+    document.getElementById('fbConsAutoCol').style.display = 'none';
+    document.getElementById('fbConsLeyenda').style.gridTemplateColumns = '2fr 1fr';
+
+    document.getElementById('fbConsBody').innerHTML =
+        '<div style="text-align:center;padding:48px;color:#94a3b8;font-size:.85rem;">Cargando datos...</div>';
+
+    fetch(FB_APP_URL + 'feedback/?action=getConsolidadoEA&idEmpleado=' + idEmpleado, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const comps = data.competencias || [];
+        if (!comps.length) {
+            document.getElementById('fbConsBody').innerHTML =
+                '<div style="text-align:center;padding:48px;color:#94a3b8;">Sin evaluación EA registrada.</div>';
+            return;
+        }
+        let html = '';
+        comps.forEach(c => { html += _consRenderFila(c.num, c.nombre, c.valor, c.etiqueta, c.justificacion); });
+        document.getElementById('fbConsBody').innerHTML = html;
+
+        _consRenderChart(
+            comps.map(c => c.nombre),
+            [{
+                label: 'Evaluación EA',
+                data: comps.map(c => c.valor),
+                backgroundColor: 'rgba(124,58,237,.12)',
+                borderColor: '#7c3aed',
+                borderWidth: 2,
+                pointBackgroundColor: '#7c3aed',
+                pointRadius: 4,
+                pointHoverRadius: 6,
+            }]
+        );
+    })
+    .catch(() => {
+        document.getElementById('fbConsBody').innerHTML =
+            '<div style="text-align:center;padding:48px;color:#ef4444;">Error al cargar los datos.</div>';
     });
 }
 </script>

@@ -47,8 +47,8 @@
                     NVL(HUM.CONTRASENA_TEMP, 0) AS CONTRASENA_TEMP
                 FROM VAADINWEB.HUMUSUARIOS HUM
                 INNER JOIN ZAYMAWEB.GHEMPEMPLEADOS EM ON TRIM(HUM.IDENTIFICACION) = TRIM(EM.IDENTIFICACION)
-                INNER JOIN ZAYMAWEB.GHEMPUBICACION UB ON EM.IDEMPLEADO = UB.IDEMPLEADO AND UB.TIPO = 'ACTUAL'
-                INNER JOIN ZAYMAWEB.GHEMPCARGOS CA ON UB.IDEMPCARGO = CA.IDEMPCARGO
+                LEFT JOIN ZAYMAWEB.GHEMPUBICACION UB ON EM.IDEMPLEADO = UB.IDEMPLEADO AND UB.TIPO = 'ACTUAL'
+                LEFT JOIN ZAYMAWEB.GHEMPCARGOS CA ON UB.IDEMPCARGO = CA.IDEMPCARGO
                 LEFT JOIN ZAYMAWEB.GEGENERICA GE ON CA.CODNIVELCARGO = GE.CODIGO AND GE.CAMPO = 'NIVELCARGO'
                 WHERE ESTADOEMPLEADO = 1 AND HUM.CUENTA_ACTIVA = 1 AND HUM.IDENTIFICACION = :identificacion";
 
@@ -68,7 +68,23 @@
                         $_SESSION['apellidos']=fromOracleEncoding($usuarioEncontrado['APELLIDOS']);
                         $_SESSION['idempleado']=$usuarioEncontrado['IDEMPLEADO'];
                         $_SESSION['sexo']=$usuarioEncontrado['SEXO'];
-                        $_SESSION['nivelcargo']=$usuarioEncontrado['CODNIVELCARGO'];
+
+                        // Si nómina no refleja nivel líder, verificar ES_LIDER_FUNCIONAL en HUMEMPLEADOEVAL
+                        $nivelcargoEfectivo = $usuarioEncontrado['CODNIVELCARGO'];
+                        if (!in_array($nivelcargoEfectivo, ['NC002','NC003','NC004','NC005'])) {
+                            $idEmpLF = (int)$usuarioEncontrado['IDEMPLEADO'];
+                            $sqlLF   = "SELECT ES_LIDER_FUNCIONAL FROM VAADINWEB.HUMEMPLEADOEVAL
+                                        WHERE IDEMPLEADO = :idem AND ACTIVO = 1 AND ROWNUM = 1";
+                            $qLF = oci_parse($conexion, $sqlLF);
+                            oci_bind_by_name($qLF, ':idem', $idEmpLF);
+                            oci_execute($qLF);
+                            $rLF = oci_fetch_assoc($qLF);
+                            oci_free_statement($qLF);
+                            if ($rLF && (int)$rLF['ES_LIDER_FUNCIONAL'] === 1) {
+                                $nivelcargoEfectivo = 'NC002';
+                            }
+                        }
+                        $_SESSION['nivelcargo'] = $nivelcargoEfectivo;
                         $_SESSION['rol']=$usuarioEncontrado['ROL'];
                         $_SESSION['esadmin']=(int)($usuarioEncontrado['ESADMIN'] ?? 0);
                         $_SESSION['ver_detalle_rep']=(int)($usuarioEncontrado['VER_DETALLE_REP'] ?? 0);

@@ -14,13 +14,13 @@ $esAdmin    = (int)($_SESSION['esadmin'] ?? 0);
 // Animación de bienvenida post-login
 $showWelcome = ($_GET['welcome'] ?? '') === '1';
 
-// Cargo real desde BD
+// Cargo desde HUMEMPLEADOEVAL (administrado por el director desde el panel)
 $cargoReal = '';
 try {
     $connMethod = new ReflectionMethod($modelo, 'conectar');
     $connMethod->setAccessible(true);
     $conn = $connMethod->invoke($modelo);
-    $sqlCargo = "SELECT CARGO FROM ZAYMAWEB.VST_GHEMPEMPLEADOSCARGOS WHERE IDEMPLEADO = :id AND ESPRINCIPAL = 1 AND ROWNUM = 1";
+    $sqlCargo = "SELECT CARGO FROM VAADINWEB.HUMEMPLEADOEVAL WHERE IDEMPLEADO = :id AND ROWNUM = 1";
     $qCargo   = oci_parse($conn, $sqlCargo);
     oci_bind_by_name($qCargo, ':id', $idempleado);
     oci_execute($qCargo);
@@ -69,18 +69,48 @@ $evaluoAOtros   = $totalRealizadas > 0;
 $evaluoCompleto = ($totalAEvaluar > 0 && $totalRealizadas >= $totalAEvaluar);
 $evaluoLabel    = $totalAEvaluar > 0 ? "$totalRealizadas/$totalAEvaluar" : ($evaluoAOtros ? 'Realizado' : 'Pendiente');
 
-// Plan de mejora
+// Plan de mejora (Flujo 1 — colaborador)
 $acuerdos          = $acuerdoModelo->getAcuerdosColaborador($idempleado, $idPeriodo);
 $totalAcuerdos     = count($acuerdos);
 $aprobados         = count(array_filter($acuerdos, fn($a) => $a['ESTADO'] === 'APROBADO'));
 $respondidos       = count(array_filter($acuerdos, fn($a) => in_array($a['ESTADO'], ['RESPONDIDO','APROBADO'])));
 $pendientesAcuerdo = $totalAcuerdos - $respondidos;
 
+// Plan de mejora EA (Flujo 3 — solo visible si el colaborador ya firmó)
+$acuerdosEAHome    = $idPeriodo ? $acuerdoModelo->getAcuerdosColaboradorEA($idempleado, $idPeriodo) : [];
+$totalEAHome       = count($acuerdosEAHome);
+$firmadoEAHome     = $totalEAHome > 0 && (int)($acuerdosEAHome[0]['FIRMADO_COLAB'] ?? 0) === 1;
+$aprobadosEAHome   = $firmadoEAHome ? count(array_filter($acuerdosEAHome, fn($a) => $a['ESTADO'] === 'APROBADO'))   : 0;
+$respondidosEAHome = $firmadoEAHome ? count(array_filter($acuerdosEAHome, fn($a) => in_array($a['ESTADO'], ['RESPONDIDO','APROBADO']))) : 0;
+$pendientesEAHome  = $firmadoEAHome ? ($totalEAHome - $respondidosEAHome) : 0;
+
 // Estado del feedback para el colaborador (2 estados: reunión futura / feedback completo)
 $feedbackEstado = null;
 if ($idPeriodo) {
     $fbModel        = new \app\models\feedbackModel();
     $feedbackEstado = $fbModel->getFeedbackEstado($idempleado, $idPeriodo);
+}
+
+// Estado del feedback Experiencia Azul (TIPO_FEEDBACK=3) — para colaboradores asistenciales
+$feedbackEAEstado = null;
+if ($idPeriodo) {
+    try {
+        $fbModelEA    = new \app\models\feedbackModel();
+        $feedbackEAEstado = $fbModelEA->getFeedbackEAEstado($idempleado, $idPeriodo);
+    } catch (Exception $e) {
+        $feedbackEAEstado = null;
+    }
+}
+
+// Estado del feedback de liderazgo (TIPO_FEEDBACK=2) — banner para líderes con feedback pendiente de firma
+$feedbackDirEstado = null;
+if ($esLider && $idPeriodo) {
+    try {
+        $fbModelDir    = new \app\models\feedbackModel();
+        $feedbackDirEstado = $fbModelDir->getFeedbackDirEstadoLider($idempleado, $idPeriodo);
+    } catch (Exception $e) {
+        $feedbackDirEstado = null;
+    }
 }
 
 // Es líder funcional
@@ -136,6 +166,17 @@ if ($esLiderFuncional && $idPeriodo) {
     }
 }
 
+// Feedbacks agendados con firma pendiente (para líderes/directores)
+$feedbacksPendLider = [];
+if ($esLiderFuncional && $idPeriodo) {
+    try {
+        $fbPendModel        = new \app\models\feedbackModel();
+        $feedbacksPendLider = $fbPendModel->getFeedbacksPendientesLider($idempleado, $idPeriodo);
+    } catch (Exception $e) {
+        $feedbacksPendLider = [];
+    }
+}
+
 // Progreso personal
 $completados = (int)$tieneAuto + (int)$fueEvaluado + (int)$evaluoCompleto;
 $pctPersonal = round($completados / 3 * 100);
@@ -145,7 +186,7 @@ $fechaCierre   = $periodoActivo ? $periodoActivo['FECHACIERRE'] : null;
 $diasRestantes = null;
 if ($fechaCierre) {
     $hoy = new DateTime();
-    $fin = DateTime::createFromFormat('d/m/Y', $fechaCierre);
+    $fin = DateTime::createFromFormat('d/m/Y H:i:s', $fechaCierre . ' 23:59:59');
     if ($fin) {
         $diasRestantes = $fin >= $hoy ? (int)$hoy->diff($fin)->days : -1;
     }
@@ -455,46 +496,12 @@ $frase = $frases[array_rand($frases)];
     $fbFecha        = $fbPartes[0] ?? '';
     $fbHora         = $fbPartes[1] ?? '';
     $fbFechaFirma   = $feedbackEstado['FECHA_FIRMA'] ?? '';
-    // Determinar si la reunión es futura (fecha >= hoy) y aún no completada
-    $fbFuturo = false;
-    if ($fbFecha && !$fbCompleto) {
-        $hoyDt  = new DateTime();
-        $fechaDt = DateTime::createFromFormat('d/m/Y', $fbFecha);
-        $fbFuturo = $fechaDt && $fechaDt >= $hoyDt;
-    }
+    // Mostrar banner pendiente siempre que el feedback esté registrado y no se haya completado la firma
+    $fbPendiente = !$fbCompleto;
 ?>
 
-<?php if ($fbCompleto): ?>
-<!-- Feedback completado — banner verde informativo -->
-<div class="hm-fade d2" style="
-    background:linear-gradient(135deg,#f0fdf4,#dcfce7);
-    border:1.5px solid #86efac;
-    border-radius:16px;padding:16px 22px;
-    display:flex;align-items:center;gap:16px;
-    margin-bottom:16px;
-    box-shadow:0 1px 4px rgba(22,163,74,0.08);">
-    <div style="font-size:28px;flex-shrink:0;color:#16a34a;"><?= icon('circle-check', 20) ?></div>
-    <div style="flex:1;">
-        <div style="font-size:.78rem;font-weight:700;letter-spacing:1px;
-                    text-transform:uppercase;color:#15803d;margin-bottom:3px;">
-            Feedback recibido
-        </div>
-        <div style="font-size:.92rem;font-weight:600;color:#1e293b;">
-            Tu líder <strong><?= $fbNombreLider ?></strong> te realizó feedback
-            <?php if ($fbFechaFirma): ?>el <strong><?= htmlspecialchars($fbFechaFirma) ?></strong><?php endif; ?>
-        </div>
-        <div style="font-size:.8rem;color:#15803d;margin-top:5px;">
-            <?= icon('target', 14) ?>
-            <a href="<?= APP_URL ?>reportes/?tab=plan&sub=colab"
-               style="color:#15803d;font-weight:600;text-decoration:underline;">
-                Ver mi Plan de Mejora →
-            </a>
-        </div>
-    </div>
-</div>
-
-<?php elseif ($fbFuturo): ?>
-<!-- Reunión futura — banner azul -->
+<?php if (!$fbFirmadoColab): ?>
+<!-- Feedback pendiente de firma — banner azul -->
 <div class="hm-fade d2" style="
     background:linear-gradient(135deg,#eff6ff,#dbeafe);
     border:1.5px solid #93c5fd;
@@ -502,28 +509,247 @@ $frase = $frases[array_rand($frases)];
     display:flex;align-items:center;gap:16px;
     margin-bottom:16px;
     box-shadow:0 1px 4px rgba(37,99,235,0.08);">
-    <div style="font-size:28px;flex-shrink:0;"><?= icon('calendar', 14) ?></div>
+    <div style="flex-shrink:0;color:#1d4ed8;"><?= icon('calendar', 28) ?></div>
     <div style="flex:1;">
         <div style="font-size:.78rem;font-weight:700;letter-spacing:1px;
                     text-transform:uppercase;color:#1d4ed8;margin-bottom:3px;">
-            Reunión de feedback agendada
+            Feedback recibido — pendiente de firma
         </div>
-        <div style="font-size:.95rem;font-weight:600;color:#1e293b;">
-            Tu líder <strong><?= $fbNombreLider ?></strong> ha agendado una reunión contigo
+        <div style="font-size:.92rem;font-weight:600;color:#1e293b;">
+            Tu líder <strong><?= $fbNombreLider ?></strong> registró tu retroalimentación
+            <?php if ($fbFecha): ?>el <strong><?= htmlspecialchars($fbFecha) ?></strong><?php endif; ?>
         </div>
-        <div style="font-size:.82rem;color:#1d4ed8;margin-top:4px;">
-            <?= icon('calendar', 14) ?> <strong><?= htmlspecialchars($fbFecha) ?></strong>
-            <?php if ($fbHora): ?>
-            &nbsp;<?= icon('clock', 14) ?> <strong><?= htmlspecialchars($fbHora) ?></strong>
-            <?php endif; ?>
-        </div>
-        <div style="font-size:.78rem;color:#3b82f6;margin-top:6px;">
-            <?= icon('lightbulb', 14) ?> Prepárate para tu reunión de retroalimentación.
+        <div style="font-size:.78rem;color:#1d4ed8;margin-top:6px;">
+            <?= icon('pencil', 14) ?> Ingresa al módulo de <strong>Feedback</strong> para firmar tu conformidad.
         </div>
     </div>
 </div>
 <?php endif; ?>
 
+<?php endif; ?>
+
+<?php if ($feedbackEAEstado): ?>
+<?php
+$eaPartes      = explode(' ', $feedbackEAEstado['FECHA_FEEDBACK'] ?? '');
+$eaFecha       = $eaPartes[0] ?? '';
+$eaHora        = $eaPartes[1] ?? '';
+$eaNombreLider = htmlspecialchars($feedbackEAEstado['NOMBRE_LIDER'] ?? '');
+?>
+<!-- Banner Experiencia Azul — feedback recibido -->
+<div class="hm-fade d2" style="
+    background:linear-gradient(135deg,#ecfeff,#cffafe);
+    border:1.5px solid #67e8f9;
+    border-radius:16px;padding:16px 22px;
+    display:flex;align-items:center;gap:16px;
+    margin-bottom:16px;
+    box-shadow:0 1px 4px rgba(8,145,178,0.10);">
+    <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
+                background:linear-gradient(135deg,#0891b2,#06b6d4);
+                display:flex;align-items:center;justify-content:center;color:#fff;">
+        <?= icon('star', 22) ?>
+    </div>
+    <div style="flex:1;">
+        <div style="font-size:.78rem;font-weight:700;letter-spacing:1px;
+                    text-transform:uppercase;color:#0891b2;margin-bottom:3px;">
+            Feedback Experiencia Azul recibido
+        </div>
+        <div style="font-size:.92rem;font-weight:600;color:#1e293b;">
+            Tu líder <strong><?= $eaNombreLider ?></strong> registró tu retroalimentación de Experiencia Azul
+        </div>
+        <?php if ($eaFecha): ?>
+        <div style="font-size:.78rem;color:#0891b2;margin-top:4px;">
+            <?= icon('calendar', 14) ?> <strong><?= htmlspecialchars($eaFecha) ?></strong>
+            <?php if ($eaHora): ?>&nbsp;<?= icon('clock', 14) ?> <strong><?= htmlspecialchars($eaHora) ?></strong><?php endif; ?>
+        </div>
+        <?php endif; ?>
+        <div style="font-size:.78rem;color:#0891b2;margin-top:6px;">
+            <?= icon('pencil', 14) ?> Ingresa al m&oacute;dulo de <strong>Feedback</strong> para firmar tu conformidad.
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($feedbackDirEstado):
+$dirPartes      = explode(' ', $feedbackDirEstado['FECHA_FEEDBACK'] ?? '');
+$dirFecha       = $dirPartes[0] ?? '';
+$dirHora        = $dirPartes[1] ?? '';
+$dirNombreDir   = htmlspecialchars($feedbackDirEstado['NOMBRE_DIRECTOR'] ?? '');
+?>
+<!-- Banner Flujo 2 — líder con feedback de liderazgo pendiente de firma -->
+<div class="hm-fade d2" style="
+    background:linear-gradient(135deg,#fffbeb,#fef3c7);
+    border:1.5px solid #fcd34d;
+    border-radius:16px;padding:16px 22px;
+    display:flex;align-items:center;gap:16px;
+    margin-bottom:16px;
+    box-shadow:0 1px 4px rgba(245,158,11,0.10);">
+    <div style="width:44px;height:44px;border-radius:12px;flex-shrink:0;
+                background:linear-gradient(135deg,#d97706,#f59e0b);
+                display:flex;align-items:center;justify-content:center;color:#fff;">
+        <?= icon('award', 22) ?>
+    </div>
+    <div style="flex:1;">
+        <div style="font-size:.78rem;font-weight:700;letter-spacing:1px;
+                    text-transform:uppercase;color:#92400e;margin-bottom:3px;">
+            Feedback de liderazgo — pendiente de firma
+        </div>
+        <div style="font-size:.92rem;font-weight:600;color:#1e293b;">
+            Tu director <strong><?= $dirNombreDir ?></strong> registró tu retroalimentación de liderazgo
+            <?php if ($dirFecha): ?>el <strong><?= htmlspecialchars($dirFecha) ?></strong><?php endif; ?>
+        </div>
+        <div style="font-size:.78rem;color:#92400e;margin-top:6px;">
+            <?= icon('pencil', 14) ?> Ingresa al módulo de <strong>Feedback</strong> para firmar tu conformidad.
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ── PENDIENTES DE FIRMA — visible solo para líderes/directores ── -->
+<?php if (!empty($feedbacksPendLider)):
+    // Agrupar por tipo
+    $pendColab  = array_values(array_filter($feedbacksPendLider, fn($r) => $r['TIPO_FEEDBACK'] === 1));
+    $pendLiderF = array_values(array_filter($feedbacksPendLider, fn($r) => $r['TIPO_FEEDBACK'] === 2));
+    $pendEA     = array_values(array_filter($feedbacksPendLider, fn($r) => $r['TIPO_FEEDBACK'] === 3));
+    $totalPend  = count($feedbacksPendLider);
+    $colsPend   = (($pendColab ? 1 : 0) + ($pendLiderF ? 1 : 0) + ($pendEA ? 1 : 0)) >= 2 ? '1fr 1fr' : '1fr';
+?>
+<div id="hm-pend-widget" class="hm-card hm-fade d2" style="margin-bottom:16px;border-left:4px solid #f59e0b;padding:20px 24px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div style="width:34px;height:34px;border-radius:10px;flex-shrink:0;
+                    background:linear-gradient(135deg,#f59e0b,#fbbf24);
+                    display:flex;align-items:center;justify-content:center;">
+            <?= icon('bell', 16, '#fff') ?>
+        </div>
+        <div>
+            <div style="font-size:.75rem;font-weight:700;letter-spacing:1.2px;
+                        text-transform:uppercase;color:#92400e;">Feedbacks pendientes de firma</div>
+            <div style="font-size:.8rem;color:#b45309;margin-top:1px;">
+                <?= $totalPend !== 1 ? 'Sesiones programadas' : 'Sesión programada' ?> en espera de realizarse
+            </div>
+        </div>
+        <div style="margin-left:auto;background:#fef3c7;border:1px solid #fde68a;
+                    border-radius:99px;padding:4px 14px;font-size:.8rem;
+                    font-weight:700;color:#92400e;">
+            <?= $totalPend ?> pendiente<?= $totalPend !== 1 ? 's' : '' ?>
+        </div>
+    </div>
+
+    <div style="display:grid;gap:10px;grid-template-columns:<?= $colsPend ?>">
+
+    <?php if (!empty($pendColab)): ?>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#2563eb;flex-shrink:0;"></div>
+            <span style="font-size:.72rem;font-weight:700;letter-spacing:1px;
+                         text-transform:uppercase;color:#1d4ed8;">
+                Flujo 1 · Feedback de desempeño
+            </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+        <?php foreach ($pendColab as $p): ?>
+            <div style="display:flex;align-items:center;gap:10px;
+                        background:#fff;border:1px solid #dbeafe;
+                        border-radius:8px;padding:9px 12px;">
+                <div style="flex-shrink:0;color:#2563eb;"><?= icon('user', 14) ?></div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.84rem;font-weight:600;color:#1e293b;
+                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <?= htmlspecialchars($p['NOMBRE_EMPLEADO']) ?>
+                    </div>
+                    <?php if ($p['FECHA_FEEDBACK']): ?>
+                    <div style="font-size:.72rem;color:#3b82f6;margin-top:2px;">
+                        <?= icon('calendar', 11) ?> <?= htmlspecialchars($p['FECHA_FEEDBACK']) ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div style="flex-shrink:0;background:#fef3c7;border-radius:6px;
+                            padding:3px 9px;font-size:.69rem;font-weight:700;color:#92400e;">
+                    Sin firma
+                </div>
+            </div>
+        <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($pendLiderF)): ?>
+    <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:12px;padding:14px 16px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#7c3aed;flex-shrink:0;"></div>
+            <span style="font-size:.72rem;font-weight:700;letter-spacing:1px;
+                         text-transform:uppercase;color:#6d28d9;">
+                Flujo 2 · Feedback de liderazgo
+            </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+        <?php foreach ($pendLiderF as $p): ?>
+            <div style="display:flex;align-items:center;gap:10px;
+                        background:#fff;border:1px solid #e9d5ff;
+                        border-radius:8px;padding:9px 12px;">
+                <div style="flex-shrink:0;color:#7c3aed;"><?= icon('award', 14) ?></div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.84rem;font-weight:600;color:#1e293b;
+                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <?= htmlspecialchars($p['NOMBRE_EMPLEADO']) ?>
+                    </div>
+                    <?php if ($p['FECHA_FEEDBACK']): ?>
+                    <div style="font-size:.72rem;color:#7c3aed;margin-top:2px;">
+                        <?= icon('calendar', 11) ?> <?= htmlspecialchars($p['FECHA_FEEDBACK']) ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div style="flex-shrink:0;background:#fef3c7;border-radius:6px;
+                            padding:3px 9px;font-size:.69rem;font-weight:700;color:#92400e;">
+                    Sin firma
+                </div>
+            </div>
+        <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <?php if (!empty($pendEA)): ?>
+    <div style="background:#ecfeff;border:1px solid #a5f3fc;border-radius:12px;padding:14px 16px;">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#0891b2;flex-shrink:0;"></div>
+            <span style="font-size:.72rem;font-weight:700;letter-spacing:1px;
+                         text-transform:uppercase;color:#0e7490;">
+                Flujo 3 · Experiencia Azul
+            </span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+        <?php foreach ($pendEA as $p): ?>
+            <div style="display:flex;align-items:center;gap:10px;
+                        background:#fff;border:1px solid #cffafe;
+                        border-radius:8px;padding:9px 12px;">
+                <div style="flex-shrink:0;color:#0891b2;"><?= icon('star', 14) ?></div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:.84rem;font-weight:600;color:#1e293b;
+                                white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        <?= htmlspecialchars($p['NOMBRE_EMPLEADO']) ?>
+                    </div>
+                    <?php if ($p['FECHA_FEEDBACK']): ?>
+                    <div style="font-size:.72rem;color:#0891b2;margin-top:2px;">
+                        <?= icon('calendar', 11) ?> <?= htmlspecialchars($p['FECHA_FEEDBACK']) ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                <div style="flex-shrink:0;background:#fef3c7;border-radius:6px;
+                            padding:3px 9px;font-size:.69rem;font-weight:700;color:#92400e;">
+                    Sin firma
+                </div>
+            </div>
+        <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    </div><!-- /grid -->
+
+    <div style="margin-top:12px;font-size:.75rem;color:#b45309;">
+        <?= icon('info', 12) ?> Una vez realizada la sesión, el colaborador o líder firma el recibido directamente en esta plataforma para desbloquear su <strong>Plan de Mejora</strong>.
+    </div>
+</div>
 <?php endif; ?>
 
 <!-- ── FILA 1: Evaluaciones + Equipo ── -->
@@ -616,9 +842,11 @@ $frase = $frases[array_rand($frases)];
 <?php
 $tieneColab = $totalAcuerdos > 0;
 $tieneLider = $esLiderFuncional && !empty($acuerdosLiderHome);
-$colsPlan   = ($tieneColab && $tieneLider) ? 'hm-col2' : '';
+$tieneEAH   = $firmadoEAHome && $totalEAHome > 0;
+$cantPlanes = (int)$tieneColab + (int)$tieneLider + (int)$tieneEAH;
+$colsPlan   = match($cantPlanes) { 2 => 'hm-col2', 3 => 'hm-col3', default => '' };
 ?>
-<?php if ($tieneColab || $tieneLider): ?>
+<?php if ($tieneColab || $tieneLider || $tieneEAH): ?>
 <div class="hm-row <?= $colsPlan ?>">
 
     <!-- PLAN DE MEJORA COLABORADOR -->
@@ -710,6 +938,46 @@ $colsPlan   = ($tieneColab && $tieneLider) ? 'hm-col2' : '';
         </div>
         <a class="hm-link" href="<?= APP_URL ?>reportes/?tab=plan&sub=lider">Ver mi plan de liderazgo →</a>
         <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- PLAN DE MEJORA EXPERIENCIA AZUL -->
+    <?php if ($tieneEAH): ?>
+    <div class="hm-card hm-fade d<?= $cantPlanes >= 3 ? '5' : '4' ?>"
+         style="border-top:3px solid #06b6d4;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+            <div style="width:28px;height:28px;border-radius:8px;flex-shrink:0;
+                        background:linear-gradient(135deg,#0891b2,#06b6d4);
+                        display:flex;align-items:center;justify-content:center;">
+                <?= icon('star', 14, '#fff') ?>
+            </div>
+            <div class="hm-card-label" style="margin:0;color:#0891b2;">Mi plan de mejora · Experiencia Azul</div>
+        </div>
+        <div class="hm-plan-row">
+            <div class="hm-plan-box" style="background:#fef9c3;border-color:#fde68a;">
+                <span class="hm-plan-n" style="color:#92400e;"><?= $pendientesEAHome ?></span>
+                <span class="hm-plan-l" style="color:#b45309;">Pendientes</span>
+            </div>
+            <div class="hm-plan-box" style="background:#cffafe;border-color:#a5f3fc;">
+                <span class="hm-plan-n" style="color:#0c4a6e;"><?= $respondidosEAHome - $aprobadosEAHome ?></span>
+                <span class="hm-plan-l" style="color:#0891b2;">En revisión</span>
+            </div>
+            <div class="hm-plan-box" style="background:#dcfce7;border-color:#bbf7d0;">
+                <span class="hm-plan-n" style="color:#15803d;"><?= $aprobadosEAHome ?></span>
+                <span class="hm-plan-l" style="color:#166534;">Aprobados</span>
+            </div>
+        </div>
+        <?php $pctEAHome = $totalEAHome > 0 ? round($aprobadosEAHome/$totalEAHome*100) : 0; ?>
+        <div class="hm-card-label" style="margin-bottom:4px;color:#0891b2;">Progreso competencias EA</div>
+        <div class="hm-bar-track">
+            <div class="hm-bar-fill" style="width:<?= $pctEAHome ?>%;background:linear-gradient(90deg,#0891b2,#06b6d4);"></div>
+        </div>
+        <div class="hm-bar-meta">
+            <span><?= $aprobadosEAHome ?>/<?= $totalEAHome ?> aprobados</span>
+            <span><?= $totalEAHome > 0 ? round($aprobadosEAHome/$totalEAHome*100) : 0 ?>%</span>
+        </div>
+        <a class="hm-link" href="<?= APP_URL ?>reportes/?tab=plan&sub=ea"
+           style="color:#0891b2;">Ver mi plan EA →</a>
     </div>
     <?php endif; ?>
 
@@ -856,14 +1124,13 @@ document.getElementById('hmSplash').addEventListener('animationend', function(e)
 // Mostrar alerta de período no disponible si viene de evaluarController
 if (sessionStorage.getItem('sinPeriodo') === '1') {
     sessionStorage.removeItem('sinPeriodo');
-    document.addEventListener('DOMContentLoaded', function() {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Período no disponible',
-            text: 'No hay un período de evaluación activo en este momento. Contacta al área de Gestión Humana.',
-            confirmButtonText: 'Entendido',
-            confirmButtonColor: '#0058af'
-        });
+    // Swal está cargado sincrónicamente desde head.php — se puede llamar directo
+    Swal.fire({
+        icon: 'warning',
+        title: 'Período no disponible',
+        text: 'No hay un período de evaluación activo en este momento. Contacta al área de Gestión Humana.',
+        confirmButtonText: 'Entendido',
+        confirmButtonColor: '#0058af'
     });
 }
 (function(){
@@ -1015,6 +1282,7 @@ function iniciarTourHome() {
         var tieneColab   = <?= ($totalAcuerdos > 0)                         ? 'true' : 'false' ?>;
         var tieneLider   = <?= ($esLiderFuncional && !empty($acuerdosLiderHome)) ? 'true' : 'false' ?>;
         var tienePeriodo = <?= $periodoActivo ? 'true' : 'false' ?>;
+        var tienePendFb  = <?= !empty($feedbacksPendLider) ? 'true' : 'false' ?>;
 
         function ic(name, color) {
             color = color || '#0058af';
@@ -1122,7 +1390,26 @@ function iniciarTourHome() {
                 });
             }
 
-            // ── 7. Plan de mejora (si tiene acuerdos) ──────────────────────
+            // ── 7. Widget feedbacks pendientes (solo líderes/directores) ────
+            if (esLiderFn && tienePendFb && document.getElementById('hm-pend-widget')) {
+                pasos.push({
+                    element: '#hm-pend-widget',
+                    popover: {
+                        title:       ic('bell','#d97706') + ' Sesiones de feedback pendientes',
+                        description: 'Este panel aparece cuando tienes reuniones de retroalimentación ' +
+                                     'programadas que aún no se han realizado ni firmado.<br><br>' +
+                                     '<strong style="color:#1d4ed8;">Flujo 1 · Desempeño</strong> — reunión líder → colaborador.<br>' +
+                                     '<strong style="color:#6d28d9;">Flujo 2 · Liderazgo</strong> — reunión director → líder.<br>' +
+                                     '<strong style="color:#0891b2;">Flujo 3 · Experiencia Azul</strong> — reunión líder → personal asistencial.<br><br>' +
+                                     'Cada tarjeta muestra el nombre y la fecha pactada. ' +
+                                     'El chip <strong>Sin firma</strong> desaparecerá cuando el colaborador o líder ' +
+                                     'firme el recibido en la sesión de <strong>Feedback</strong>.',
+                        side: 'bottom', align: 'start'
+                    }
+                });
+            }
+
+            // ── 8. Plan de mejora (si tiene acuerdos) ──────────────────────
             if ((tieneColab || tieneLider) && document.querySelector('.hm-plan-row')) {
                 pasos.push({
                     element: '.hm-plan-row',

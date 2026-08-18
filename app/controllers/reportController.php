@@ -310,7 +310,8 @@ class reportController extends mainModel {
             ],
             'evaluadores'        => $this->modelo->obtenerEvaluadores($idTrabajo),
             'periodoActivo'      => $periodoActivo,
-            'acuerdosColaborador' => $idPeriodoAux ? $acuerdoModelo->getAcuerdosColaborador((int)$_SESSION['idempleado'], $idPeriodoAux) : [],
+            'acuerdosColaborador'   => $idPeriodoAux ? $acuerdoModelo->getAcuerdosColaborador((int)$_SESSION['idempleado'], $idPeriodoAux) : [],
+            'acuerdosColaboradorEA' => $idPeriodoAux ? $acuerdoModelo->getAcuerdosColaboradorEA((int)$_SESSION['idempleado'], $idPeriodoAux) : [],
 
             'agregados'          => [
                 'desempeno' => $this->modelo->getIndicadoresDesempeno($idTrabajo, $periodoActivo),

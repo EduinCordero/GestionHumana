@@ -143,6 +143,19 @@
             return $sql;
         }
 
+        /*---------- Período de evaluación activo ----------*/
+        public function getPeriodoActivo() {
+            $sql = "SELECT IDPERIODO, NOMBRE FROM VAADINWEB.HUMPERIODOEVALUACION
+                    WHERE ESTADO = 1
+                      AND TRUNC(SYSDATE) BETWEEN TRUNC(FECHAAPERTURA) AND TRUNC(FECHACIERRE)
+                      AND ROWNUM = 1";
+            $res = $this->ejecutarConsulta($sql);
+            $row = $res ? oci_fetch_assoc($res) : null;
+            if ($res) oci_free_statement($res);
+            if (is_array($row)) $row['NOMBRE'] = fromOracleEncoding($row['NOMBRE'] ?? '');
+            return $row ?: null;
+        }
+
         /*---------- Listar usuarios ----------*/
         public function ListarUsuarios($conn){
             $usuarios = "SELECT A.USUARIO, A.NOMBRES||' '||A.APELLIDOS AS NOMBRE, 

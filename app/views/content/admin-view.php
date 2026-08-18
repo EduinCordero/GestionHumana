@@ -272,10 +272,10 @@ foreach ($avanceProceso as $row) {
             <?= $periodoActivo['FECHACIERRE'] ?>
             <?php
             $hoy     = new DateTime();
-            $cierre  = DateTime::createFromFormat('d/m/Y', $periodoActivo['FECHACIERRE']);
+            $cierre  = DateTime::createFromFormat('d/m/Y H:i:s', $periodoActivo['FECHACIERRE'] . ' 23:59:59');
             $diff    = $hoy->diff($cierre);
-            $diasRest = (int)$cierre->format('U') - (int)$hoy->format('U');
-            if ($diasRest > 0):
+            $diasRest = $cierre >= $hoy;
+            if ($diasRest):
                 $diasNum = (int)$diff->days;
             ?>
             &nbsp;·&nbsp;
@@ -468,6 +468,44 @@ foreach ($avanceProceso as $row) {
                         <?php else: ?>
                         <?= icon('check-circle', 14) ?> Habilitar Feedback
                         <?php endif; ?>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ── Límite de objetivos SMART ───────────────────────────────────── -->
+        <div class="adm-card" style="margin-top:20px;">
+            <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.06em;color:var(--adm-muted);margin-bottom:16px;">
+                <?= icon('target', 15) ?> Objetivos SMART — Límite por colaborador / líder
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        gap:20px;flex-wrap:wrap;">
+                <div>
+                    <div style="font-weight:600;font-size:.92rem;margin-bottom:5px;">
+                        Máximo de objetivos SMART asignables en el proceso de Feedback
+                    </div>
+                    <div style="font-size:.82rem;color:var(--adm-muted);line-height:1.6;max-width:540px;">
+                        Este valor aplica a los tres flujos del proceso:
+                        <strong>Desempeño (FL1)</strong> — objetivos que el líder asigna a cada colaborador de su equipo;
+                        <strong>Liderazgo (FL2)</strong> — objetivos que el director asigna a cada líder funcional;
+                        <strong>Experiencia Azul (FL3)</strong> — objetivos que el líder asigna a colaboradores asistenciales.
+                    </div>
+                    <div style="margin-top:10px;font-size:.82rem;color:var(--adm-muted);">
+                        Valor actual: <strong style="color:var(--adm-primary);"><?= (int)($maxObjetivos ?? 3) ?> objetivos</strong>
+                    </div>
+                </div>
+                <form method="POST" style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                    <input type="hidden" name="action"    value="setMaxObjetivos">
+                    <input type="hidden" name="activeTab" value="periodos">
+                    <input type="number" name="valor"
+                           value="<?= (int)($maxObjetivos ?? 3) ?>"
+                           min="1" max="10"
+                           style="width:70px;padding:8px 10px;border:1.5px solid var(--adm-border);
+                                  border-radius:8px;font-size:.92rem;font-weight:600;
+                                  text-align:center;background:var(--adm-bg);color:var(--adm-text);">
+                    <button type="submit" class="adm-btn adm-btn-primary" style="min-width:130px;">
+                        <?= icon('device-floppy', 14) ?> Guardar
                     </button>
                 </form>
             </div>
@@ -1340,7 +1378,7 @@ function admToggleFeedback(nuevoValor) {
     ══════════════════════════════════ -->
     <?php if ($activeTab === 'objetivos'): ?>
     <div id="adm-objetivos" class="adm-panel active">
-        <div class="adm-grid2">
+        <div class="adm-grid2" id="objGrid" style="align-items:start;">
 
             <!-- Formulario crear/editar objetivo -->
             <div class="adm-card">
@@ -1444,7 +1482,7 @@ function admToggleFeedback(nuevoValor) {
             </div>
 
             <!-- Lista de objetivos -->
-            <div class="adm-card">
+            <div class="adm-card" style="display:flex;flex-direction:column;overflow:hidden;">
                 <div style="font-size:.82rem;font-weight:700;text-transform:uppercase;
                             letter-spacing:.06em;color:var(--adm-muted);margin-bottom:10px;">
                     Objetivos registrados
@@ -1470,7 +1508,7 @@ function admToggleFeedback(nuevoValor) {
                     </select>
                 </div>
                 <?php if (!empty($objetivos)): ?>
-                <div style="max-height:560px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;"
+                <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:2px;"
                      id="listaObjetivos">
                     <?php
                     $calColors = [
@@ -1480,16 +1518,25 @@ function admToggleFeedback(nuevoValor) {
                         4 => ['bg'=>'#d1fae5','color'=>'#065f46','label'=>'Acorde'],
                         5 => ['bg'=>'#dbeafe','color'=>'#1e40af','label'=>'Sobresaliente'],
                     ];
+                    $modeloColor = [
+                        'Cierre de brecha'       => '#ef4444',
+                        'Consolidación'          => '#f59e0b',
+                        'Expansión / referente'  => '#10b981',
+                    ];
                     foreach ($objetivos as $obj):
-                        $cc       = $calColors[(int)$obj['CALIFICACION']] ?? ['bg'=>'#f1f5f9','color'=>'#475569','label'=>''];
-                        $esActivo = $obj['ACTIVO'] == 1;
-                        $modelo   = $obj['MODELO'] ?? '';
+                        $cc         = $calColors[(int)$obj['CALIFICACION']] ?? ['bg'=>'#f1f5f9','color'=>'#475569','label'=>''];
+                        $esActivo   = $obj['ACTIVO'] == 1;
+                        $modelo     = $obj['MODELO'] ?? '';
+                        $borderCol  = $modeloColor[$modelo] ?? '#cbd5e1';
                     ?>
                     <div class="obj-item"
                          data-comp="<?= $obj['NUM_COMPETENCIA'] ?>"
                          data-cal="<?= $obj['CALIFICACION'] ?>"
-                         style="border:1.5px solid var(--adm-border);border-radius:10px;
-                                padding:12px 14px;<?= $esActivo ? '' : 'opacity:.5;' ?>">
+                         style="border:1.5px solid var(--adm-border);border-left:4px solid <?= $borderCol ?>;
+                                border-radius:10px;padding:12px 14px;
+                                transition:box-shadow .15s;<?= $esActivo ? '' : 'opacity:.45;' ?>"
+                         onmouseenter="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)'"
+                         onmouseleave="this.style.boxShadow=''">
                         <!-- Badges -->
                         <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
                             <span style="font-size:.7rem;font-weight:700;padding:2px 8px;
@@ -1964,10 +2011,12 @@ function admToggleFeedback(nuevoValor) {
                       onsubmit="
                           document.getElementById('evalExpAzulHidden').value = document.getElementById('evalExpAzul').checked ? 1 : 0;
                           document.getElementById('evalEsDirectorHidden').value = document.getElementById('evalEsDirector').checked ? 1 : 0;
+                          document.getElementById('evalEsLiderFuncionalHidden').value = document.getElementById('evalEsLiderFuncional').checked ? 1 : 0;
                           return true;
                       ">
-                <input type="hidden" name="aplicaExpAzul" id="evalExpAzulHidden" value="0">
-                <input type="hidden" name="esDirector"    id="evalEsDirectorHidden" value="0">
+                <input type="hidden" name="aplicaExpAzul"    id="evalExpAzulHidden" value="0">
+                <input type="hidden" name="esDirector"       id="evalEsDirectorHidden" value="0">
+                <input type="hidden" name="esLiderFuncional" id="evalEsLiderFuncionalHidden" value="0">
                 <input type="hidden" name="action"       value="editarEmpleadoEval">
                 <input type="hidden" name="activeTab"    value="colaboradores">
                 <input type="hidden" name="idAsignacion" id="evalIdAsignacion">
@@ -2001,7 +2050,8 @@ function admToggleFeedback(nuevoValor) {
                         <option value="0">— Sin jefe asignado —</option>
                         <?php foreach ($lideresEval as $lider): ?>
                         <option value="<?= $lider['IDEMPLEADO'] ?>"
-                                data-nombre="<?= htmlspecialchars($lider['NOMBRE'], ENT_QUOTES) ?>">
+                                data-nombre="<?= htmlspecialchars($lider['NOMBRE'], ENT_QUOTES) ?>"
+                                data-proceso="<?= htmlspecialchars($lider['PROCESO'] ?? '', ENT_QUOTES) ?>">
                             <?= htmlspecialchars($lider['NOMBRE']) ?>
                             <?php if ($lider['PROCESO']): ?>· <?= htmlspecialchars($lider['PROCESO']) ?><?php endif; ?>
                         </option>
@@ -2032,10 +2082,14 @@ function admToggleFeedback(nuevoValor) {
                     </div>
                 </div>
 
-                <div id="evalLiderFuncionalBadge" style="display:none;margin-bottom:10px;">
-                    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;
-                                padding:8px 12px;font-size:.78rem;color:#166534;">
-                        ✓ <strong>Líder funcional</strong> — tiene colaboradores a cargo
+                <div class="adm-form-group">
+                    <label class="adm-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                        <input type="checkbox" name="esLiderFuncional" id="evalEsLiderFuncional" value="1"
+                               style="width:16px;height:16px;">
+                        Es Líder Funcional
+                    </label>
+                    <div style="font-size:.74rem;color:var(--adm-muted);margin-top:4px;">
+                        Aparece como jefe disponible en el listado de jefe directo.
                     </div>
                 </div>
 
@@ -2209,11 +2263,9 @@ const appUrl = '<?= APP_URL ?>';
         document.getElementById('evalCargo').value               = ev.CARGO    || '';
         document.getElementById('evalEmail').value               = ev.EMAIL    || '';
         document.getElementById('evalCelular').value             = ev.CELULAR  || '';
-        document.getElementById('evalExpAzul').checked           = ev.APLICA_EXP_AZUL == 1;
-        document.getElementById('evalEsDirector').checked         = ev.ES_DIRECTOR == 1;
-        // Mostrar badge líder funcional si aplica
-        const badge = document.getElementById('evalLiderFuncionalBadge');
-        if (badge) badge.style.display = ev.ES_LIDER_FUNCIONAL == 1 ? 'block' : 'none';
+        document.getElementById('evalExpAzul').checked          = ev.APLICA_EXP_AZUL == 1;
+        document.getElementById('evalEsDirector').checked        = ev.ES_DIRECTOR == 1;
+        document.getElementById('evalEsLiderFuncional').checked  = ev.ES_LIDER_FUNCIONAL == 1;
 
         // Preseleccionar jefe
         const jefeSelect = document.getElementById('evalIdJefe');
@@ -2233,7 +2285,9 @@ const appUrl = '<?= APP_URL ?>';
 
     window.actualizarNombreJefe = function(select) {
         const opt = select.options[select.selectedIndex];
-        document.getElementById('evalNombreJefe').value = opt.dataset.nombre || '';
+        document.getElementById('evalNombreJefe').value = opt.dataset.nombre  || '';
+        const procesoField = document.getElementById('evalProceso');
+        if (procesoField && opt.dataset.proceso) procesoField.value = opt.dataset.proceso;
     };
 
     window.submitToggleEval = function() {
@@ -2321,6 +2375,28 @@ const appUrl = '<?= APP_URL ?>';
     const btnTodos = document.querySelector('.seg-filter.active');
     if (btnTodos) { btnTodos.style.opacity = '1'; btnTodos.style.fontWeight = '700'; }
 
+    // ── Igualar altura card lista con card formulario ─────────────────────────
+    (function() {
+        const grid = document.getElementById('objGrid');
+        if (!grid) return;
+        const cards = grid.querySelectorAll(':scope > .adm-card');
+        if (cards.length < 2) return;
+        const left = cards[0], right = cards[1];
+
+        function sync() {
+            right.style.height = left.offsetHeight + 'px';
+        }
+
+        // ResizeObserver reacciona al formulario (cambios de tamaño por edición)
+        if (window.ResizeObserver) {
+            new ResizeObserver(sync).observe(left);
+        }
+        window.addEventListener('resize', sync);
+        // Ejecutar después del render completo
+        window.addEventListener('load', sync);
+        setTimeout(sync, 50);
+    })();
+
     // ── Filtro de objetivos por competencia ───────────────────────────────────
     window.filtrarObjetivos = function() {
         const comp = document.getElementById('filtroCompObj')?.value || '';
@@ -2333,7 +2409,7 @@ const appUrl = '<?= APP_URL ?>';
     };
 
     window.editarObjetivo = function(obj) {
-        document.getElementById('objFormTitle').textContent = '✏️ Editando objetivo';
+        document.getElementById('objFormTitle').innerHTML   = '<span style="color:#0058af;">&#9998;</span> Editando objetivo';
         document.getElementById('objAction').value          = 'editarObjetivo';
         document.getElementById('objIdObjeto').value        = obj.IDOBJETIVO     || '';
         document.getElementById('objBtnLabel').textContent  = 'Guardar cambios';
@@ -2347,15 +2423,21 @@ const appUrl = '<?= APP_URL ?>';
         document.getElementById('objEvidencia').value       = obj.EVIDENCIA       || '';
         document.getElementById('objSeguimiento').value     = obj.SEGUIMIENTO     || '';
         document.getElementById('objUsoRecomendado').value  = obj.USO_RECOMENDADO || '';
+        // Highlight del formulario en modo edición
+        const card = document.getElementById('formObjetivo').closest('.adm-card');
+        if (card) card.style.outline = '2px solid #0058af';
         document.getElementById('formObjetivo').scrollIntoView({ behavior:'smooth', block:'start' });
     };
 
     window.resetFormObjetivo = function() {
-        document.getElementById('objFormTitle').textContent = '🎯 Nuevo objetivo SMART';
+        document.getElementById('objFormTitle').innerHTML   = '&#9678; Nuevo objetivo SMART';
         document.getElementById('objAction').value          = 'crearObjetivo';
         document.getElementById('objIdObjeto').value        = '';
         document.getElementById('objBtnLabel').textContent  = 'Crear objetivo';
         document.getElementById('formObjetivo').reset();
+        // Quitar highlight de edición
+        const card = document.getElementById('formObjetivo').closest('.adm-card');
+        if (card) card.style.outline = '';
     };
 
 

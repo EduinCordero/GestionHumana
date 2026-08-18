@@ -234,7 +234,7 @@ class acuerdoModel extends mainModel {
                 A.COMPROMISO_AJUSTADO,
                 A.COMENTARIO_LIDER,
                 O.OBJETIVO,
-                NVL(EL.PNOMBRE || ' ' || EL.PAPELLIDO, 'N/A') AS NOMBRE_LIDER,
+                NVL(EL.PNOMBRE || NVL2(EL.SNOMBRE,' '||EL.SNOMBRE,'') || ' ' || EL.PAPELLIDO || NVL2(EL.SAPELLIDO,' '||EL.SAPELLIDO,''), 'N/A') AS NOMBRE_LIDER,
                 TO_CHAR(F.FECHA_FEEDBACK, 'DD/MM/YYYY HH24:MI') AS FECHA_FEEDBACK,
                 NVL(F.FIRMADO_COLAB, 0) AS FIRMADO_COLAB
             FROM VAADINWEB.HUMACUERDOMEJORA A
@@ -269,6 +269,60 @@ class acuerdoModel extends mainModel {
     /** Devuelve los acuerdos asignados a un colaborador visibles para el líder */
     public function getAcuerdosEquipo($idEmpleado, $idPeriodo) {
         return $this->getAcuerdosColaborador($idEmpleado, $idPeriodo);
+    }
+
+    /** Devuelve los acuerdos EA (P17-P22, Flujo 3) asignados al colaborador */
+    public function getAcuerdosColaboradorEA($idEmpleado, $idPeriodo) {
+        $idEmpleado = (int)$idEmpleado;
+        $idPeriodo  = (int)$idPeriodo;
+        $sql = "
+            SELECT
+                A.IDACUERDO,
+                A.NUM_COMPETENCIA,
+                A.CALIFICACION,
+                A.ESTADO,
+                A.PLAN_ACCION,
+                A.FECHA_ASIGNACION,
+                A.FECHA_RESPUESTA,
+                A.INDICADOR,
+                A.META,
+                A.PLAZO,
+                A.EVIDENCIA,
+                A.APOYO_LIDER,
+                A.SEGUIMIENTO,
+                A.COMPROMISO_AJUSTADO,
+                A.COMENTARIO_LIDER,
+                O.OBJETIVO,
+                NVL(EL.PNOMBRE || NVL2(EL.SNOMBRE,' '||EL.SNOMBRE,'') || ' ' || EL.PAPELLIDO || NVL2(EL.SAPELLIDO,' '||EL.SAPELLIDO,''), 'N/A') AS NOMBRE_LIDER,
+                TO_CHAR(F.FECHA_FEEDBACK, 'DD/MM/YYYY HH24:MI') AS FECHA_FEEDBACK,
+                NVL(F.FIRMADO_COLAB, 0) AS FIRMADO_COLAB
+            FROM VAADINWEB.HUMACUERDOMEJORA A
+            INNER JOIN VAADINWEB.HUMOBJETIVOMEJORA O ON A.IDOBJETIVO = O.IDOBJETIVO
+            LEFT  JOIN ZAYMAWEB.GHEMPEMPLEADOS EL   ON A.IDEMPLEADO_LIDER = EL.IDEMPLEADO
+            LEFT  JOIN VAADINWEB.HUMFEEDBACK F
+                ON F.IDEMPLEADO       = A.IDEMPLEADO
+               AND F.IDEMPLEADO_LIDER = A.IDEMPLEADO_LIDER
+               AND F.IDPERIODO        = A.IDPERIODO
+               AND F.TIPO_FEEDBACK    = 3
+            WHERE A.IDEMPLEADO = $idEmpleado
+              AND A.IDPERIODO  = $idPeriodo
+              AND A.NUM_COMPETENCIA BETWEEN 17 AND 22
+            ORDER BY A.NUM_COMPETENCIA ASC, A.IDACUERDO ASC";
+        $campos = ['OBJETIVO','NOMBRE_LIDER','PLAN_ACCION','COMENTARIO_LIDER',
+                   'INDICADOR','META','PLAZO','EVIDENCIA','APOYO_LIDER',
+                   'SEGUIMIENTO','COMPROMISO_AJUSTADO'];
+        $res  = $this->ejecutarConsulta($sql);
+        $rows = [];
+        if ($res) {
+            while ($r = oci_fetch_assoc($res)) {
+                foreach ($campos as $c) {
+                    if (isset($r[$c])) $r[$c] = fromOracleEncoding($r[$c]);
+                }
+                $rows[] = $r;
+            }
+            oci_free_statement($res);
+        }
+        return $rows;
     }
 
     /** El líder aprueba el plan de acción del colaborador */

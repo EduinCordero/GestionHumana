@@ -271,12 +271,22 @@ $totalEA = count($competenciasEA);
                 box-shadow:0 24px 64px rgba(0,0,0,.25);animation:evModalIn .3s ease;text-align:center;">
         <div style="font-size:2.4rem;margin-bottom:14px;">🔵</div>
         <div style="font-size:1.05rem;font-weight:800;color:#1e3a5f;margin-bottom:14px;">Experiencia Azul — Rol Líder</div>
-        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:28px;text-align:left;
+        <div style="font-size:.85rem;color:#475569;line-height:1.75;margin-bottom:16px;text-align:left;
                     background:#f0f6ff;border-radius:12px;padding:16px 20px;border:1px solid #bfdbfe;">
             Ahora evaluarás la <strong>gestión de Experiencia Azul</strong> de
             <strong><?= htmlspecialchars($nombreEvaluado) ?></strong> como líder.
             Esta sección evalúa cómo el líder gestiona la experiencia del paciente en tu equipo.
             La escala es: <strong>Referente · Consistente · Esperado · Inconsistente · Crítico</strong>.
+        </div>
+        <div style="font-size:.88rem;color:#1e3a5f;line-height:1.8;margin-bottom:28px;text-align:center;
+                    background:linear-gradient(135deg,#dbeafe,#eff6ff);
+                    border-radius:14px;padding:20px 22px;
+                    border:1.5px solid #93c5fd;
+                    box-shadow:0 4px 16px rgba(59,130,246,.15);">
+            <div style="font-size:1.3rem;margin-bottom:10px;">💡</div>
+            <strong style="display:block;margin-bottom:10px;font-size:.8rem;text-transform:uppercase;
+                           letter-spacing:.08em;color:#1d4ed8;">Orientación antes de comenzar</strong>
+            En esta sección evalúa comportamientos observables de liderazgo vividos durante el periodo evaluado. Evita responder por simpatía personal o por un hecho aislado; piensa en la forma habitual en que tu líder orienta, acompaña, comunica y cuida al equipo.
         </div>
         <button onclick="document.getElementById('eaBienvenidaModal').style.display='none'"
                 style="padding:12px 36px;background:#0058af;color:#fff;border:none;

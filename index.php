@@ -64,6 +64,13 @@
         exit();
     }
 
+    // Interceptar POST a registrarEvaluacion antes de enviar el HTML
+    if (isset($url[0]) && $url[0] === 'registrarEvaluacion' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $insEvaluar = new evaluarController();
+        $insEvaluar->registrarEvaluacion();
+        exit();
+    }
+
     // Interceptar AJAX del módulo Admin antes del HTML
     if ($url[0] === 'admin' &&
         !empty($_SERVER['HTTP_X_REQUESTED_WITH']) &&

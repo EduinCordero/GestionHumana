@@ -21,7 +21,7 @@ class evaluarController extends mainModel {
 
     // ── Helpers privados ─────────────────────────────────────────────────────
 
-    private function getPeriodoActivo(): ?array {
+    public function getPeriodoActivo(): ?array {
         $sql = "SELECT IDPERIODO, NOMBRE,
                        TO_CHAR(FECHAAPERTURA,'DD/MM/YYYY') AS FECHAAPERTURA,
                        TO_CHAR(FECHACIERRE,'DD/MM/YYYY')   AS FECHACIERRE
@@ -36,9 +36,12 @@ class evaluarController extends mainModel {
     }
 
     private function sinPeriodo(): string {
+        $url = APP_URL . "home/";
         ob_start();
         echo "<script>sessionStorage.setItem('sinPeriodo','1');
-              window.location.href='" . APP_URL . "home/';</script>";
+              (function(){ if(document.readyState==='loading'){
+                  document.addEventListener('DOMContentLoaded',function(){ window.location.replace('$url'); });
+              } else { window.location.replace('$url'); } })();</script>";
         return ob_get_clean();
     }
 

@@ -17,89 +17,99 @@ unset($_SESSION['ea_pendiente'], $_SESSION['ea_nombre_evaluado'], $_SESSION['ea_
 
 <?php if ($evalCompletada || $eaPendiente || $eaCompletada): ?>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+// Envoltorio seguro para evitar que errores JS impidan mostrar la página
+(function(){
+    try {
+        document.addEventListener('DOMContentLoaded', function() {
 
-    <?php if ($eaCompletada): ?>
-    // Exp. Azul completada
-    Swal.fire({
-        icon: 'success',
-        title: '¡Exp. Azul completada!',
-        text: 'La evaluación de Experiencia Azul fue guardada exitosamente.',
-        confirmButtonText: 'Continuar',
-        confirmButtonColor: '#0058af',
-        timer: 3000,
-        timerProgressBar: true
-    });
+            <?php if ($eaCompletada): ?>
+            // Exp. Azul completada
+            Swal.fire({
+                icon: 'success',
+                title: '¡Exp. Azul completada!',
+                text: 'La evaluación de Experiencia Azul fue guardada exitosamente.',
+                confirmButtonText: 'Continuar',
+                confirmButtonColor: '#0058af',
+                timer: 3000,
+                timerProgressBar: true
+            });
 
-    <?php elseif ($eaPendiente === 'EXPERIENCIA_COLAB'): ?>
-    // Evaluación normal guardada + Exp. Azul pendiente (líder evalúa colaborador asistencial)
-    Swal.fire({
-        icon: 'success',
-        title: '¡Evaluación guardada!',
-        text: '<?= addslashes($evalCompletada ?: 'La evaluación fue guardada correctamente.') ?>',
-        confirmButtonText: 'Continuar',
-        confirmButtonColor: '#0058af',
-        allowOutsideClick: false
-    }).then(function() {
-        Swal.fire({
-            icon: 'info',
-            title: '🔵 Exp. Azul',
-            html: '<?= $eaNombreEvaluado ? '<b>' . addslashes($eaNombreEvaluado) . '</b> hace parte del equipo asistencial.<br><br>' : '' ?>¿Deseas continuar con la evaluación de <b>Experiencia Azul</b>?',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, continuar',
-            cancelButtonText: 'Ahora no',
-            confirmButtonColor: '#0058af',
-            cancelButtonColor: '#94a3b8',
-            allowOutsideClick: false
-        }).then(function(result) {
-            if (result.isConfirmed) {
-                window.location.href = '<?= APP_URL ?>experienciaAzulColab/';
-            }
+            <?php elseif ($eaPendiente === 'EXPERIENCIA_COLAB'): ?>
+            // Evaluación normal guardada + Exp. Azul pendiente (líder evalúa colaborador asistencial)
+            Swal.fire({
+                icon: 'success',
+                title: '¡Evaluación guardada!',
+                text: '<?= addslashes($evalCompletada ?: 'La evaluación fue guardada correctamente.') ?>',
+                confirmButtonText: 'Continuar',
+                confirmButtonColor: '#0058af',
+                allowOutsideClick: false
+            }).then(function() {
+                Swal.fire({
+                    icon: 'info',
+                    title: '🔵 Exp. Azul',
+                    html: '<?= $eaNombreEvaluado ? '<b>' . addslashes($eaNombreEvaluado) . '</b> hace parte del equipo asistencial.<br><br>' : '' ?>¿Deseas continuar con la evaluación de <b>Experiencia Azul</b>?',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, continuar',
+                    cancelButtonText: 'Ahora no',
+                    confirmButtonColor: '#0058af',
+                    cancelButtonColor: '#94a3b8',
+                    allowOutsideClick: false
+                }).then(function(result) {
+                    if (result.isConfirmed) {
+                        window.location.href = '<?= APP_URL ?>experienciaAzulColab/';
+                    }
+                });
+            });
+
+            <?php elseif ($eaPendiente === 'EXPERIENCIA_LIDER'): ?>
+            // Evaluación normal guardada + Exp. Azul pendiente (colaborador asistencial evalúa líder)
+            Swal.fire({
+                icon: 'success',
+                title: '¡Evaluación guardada!',
+                text: '<?= addslashes($evalCompletada ?: 'La evaluación fue guardada correctamente.') ?>',
+                confirmButtonText: 'Continuar',
+                confirmButtonColor: '#0058af',
+                allowOutsideClick: false
+            }).then(function() {
+                Swal.fire({
+                    icon: 'info',
+                    title: '🔵 Exp. Azul',
+                    html: 'Como colaborador asistencial puedes evaluar la gestión de Experiencia Azul de tu líder.<br><br>¿Deseas continuar?',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, continuar',
+                    cancelButtonText: 'Ahora no',
+                    confirmButtonColor: '#0058af',
+                    cancelButtonColor: '#94a3b8',
+                    allowOutsideClick: false
+                }).then(function(result) {
+                    if (result.isConfirmed) {
+                        window.location.href = '<?= APP_URL ?>experienciaAzulLider/';
+                    }
+                });
+            });
+
+            <?php else: ?>
+            // Evaluación normal guardada sin Exp. Azul
+            Swal.fire({
+                icon: 'success',
+                title: '¡Evaluación guardada!',
+                text: '<?= addslashes($evalCompletada) ?>',
+                confirmButtonText: 'Continuar',
+                confirmButtonColor: '#0058af',
+                showConfirmButton: false,
+                timer: 2500,
+                timerProgressBar: true
+            });
+            <?php endif; ?>
+
+            // Asegurar que la página sea visible incluso si hay errores posteriores
+            try { document.body.style.visibility = 'visible'; } catch(e){}
         });
-    });
-
-    <?php elseif ($eaPendiente === 'EXPERIENCIA_LIDER'): ?>
-    // Evaluación normal guardada + Exp. Azul pendiente (colaborador asistencial evalúa líder)
-    Swal.fire({
-        icon: 'success',
-        title: '¡Evaluación guardada!',
-        text: '<?= addslashes($evalCompletada ?: 'La evaluación fue guardada correctamente.') ?>',
-        confirmButtonText: 'Continuar',
-        confirmButtonColor: '#0058af',
-        allowOutsideClick: false
-    }).then(function() {
-        Swal.fire({
-            icon: 'info',
-            title: '🔵 Exp. Azul',
-            html: 'Como colaborador asistencial puedes evaluar la gestión de Experiencia Azul de tu líder.<br><br>¿Deseas continuar?',
-            showCancelButton: true,
-            confirmButtonText: 'Sí, continuar',
-            cancelButtonText: 'Ahora no',
-            confirmButtonColor: '#0058af',
-            cancelButtonColor: '#94a3b8',
-            allowOutsideClick: false
-        }).then(function(result) {
-            if (result.isConfirmed) {
-                window.location.href = '<?= APP_URL ?>experienciaAzulLider/';
-            }
-        });
-    });
-
-    <?php else: ?>
-    // Evaluación normal guardada sin Exp. Azul
-    Swal.fire({
-        icon: 'success',
-        title: '¡Evaluación guardada!',
-        text: '<?= addslashes($evalCompletada) ?>',
-        confirmButtonText: 'Continuar',
-        confirmButtonColor: '#0058af',
-        showConfirmButton: false,
-        timer: 2500,
-        timerProgressBar: true
-    });
-    <?php endif; ?>
-
-});
+    } catch (e) {
+        console.error('Error en script de notificaciones:', e);
+        try { document.body.style.visibility = 'visible'; } catch (e){}
+    }
+})();
 </script>
 <?php endif; ?>
 
